@@ -57,16 +57,25 @@ end tell
 CHROMIUM_APPS = {"Arc", "Google Chrome", "Brave Browser", "Microsoft Edge"}
 
 
-def _osascript(script: str, timeout: float = 4) -> str | None:
+def _osascript(script: str, timeout: float = 10) -> str | None:
+    global _backoff_until
+    if time.time() < _backoff_until:
+        return None
     try:
         out = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
-        log.warning("osascript timed out")
+        # Usually a macOS "python3 wants to control ..." permission dialog waiting
+        # for a click. Back off so we don't stack up dialogs.
+        log.warning("osascript timed out (a permission dialog may be waiting for Allow)")
+        _backoff_until = time.time() + 60
         return None
     if out.returncode != 0:
         log.warning("osascript error: %s", out.stderr.strip()[:200])
         return None
     return out.stdout.rstrip("\n")
+
+
+_backoff_until = 0.0
 
 
 @dataclass
