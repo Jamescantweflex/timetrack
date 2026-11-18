@@ -85,6 +85,27 @@ class Front:
     title: str | None
 
 
+_titles_enabled = True
+
+
+def _window_title() -> str | None:
+    """Native-app window title. Needs Accessibility for python3; if refused, stop asking."""
+    global _titles_enabled
+    if not _titles_enabled:
+        return None
+    try:
+        out = subprocess.run(["osascript", "-e", WINDOW_TITLE_SCRIPT], capture_output=True, text=True, timeout=4)
+    except subprocess.TimeoutExpired:
+        return None
+    if out.returncode != 0:
+        if "-1719" in out.stderr or "assistive access" in out.stderr:
+            _titles_enabled = False
+            log.info("window titles for native apps disabled: grant Accessibility to python3 in "
+                     "System Settings > Privacy & Security > Accessibility to enable (optional)")
+        return None
+    return out.stdout.strip() or None
+
+
 def read_front() -> Front | None:
     app = _osascript(FRONT_APP_SCRIPT)
     if not app:
@@ -96,8 +117,7 @@ def read_front() -> Front | None:
         res = _osascript(SAFARI_SCRIPT)
     else:
         res = None
-        t = _osascript(WINDOW_TITLE_SCRIPT, timeout=2)
-        title = t or None
+        title = _window_title()
     if res:
         parts = res.split("\t", 1)
         url = parts[0] or None
