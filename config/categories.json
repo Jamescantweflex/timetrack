@@ -1,0 +1,37 @@
+{
+  "_comment": "Add a category by adding patterns. domains match by suffix (x.com matches mobile.x.com). apps match Mac app names exactly. phone_apps match the app name you type into the iPhone Shortcut. passive=true means no-input time still counts (video).",
+  "browsers": ["Arc", "Google Chrome", "Safari", "Brave Browser", "Microsoft Edge"],
+  "ignore_apps": ["loginwindow", "ScreenSaverEngine", "Dock", "SystemUIServer", "Window Server"],
+  "categories": {
+    "X": {
+      "domains": ["x.com", "twitter.com", "t.co"],
+      "apps": [],
+      "phone_apps": ["X"],
+      "passive": false
+    },
+    "YouTube": {
+      "domains": ["youtube.com", "youtu.be", "music.youtube.com"],
+      "apps": [],
+      "phone_apps": ["YouTube"],
+      "passive": true
+    },
+    "Claude": {
+      "domains": ["claude.ai"],
+      "apps": ["Claude"],
+      "phone_apps": ["Claude"],
+      "passive": false
+    },
+    "Email": {
+      "domains": ["mail.google.com", "outlook.office.com", "outlook.live.com"],
+      "apps": ["Mail", "Microsoft Outlook"],
+      "phone_apps": ["Mail", "Outlook"],
+      "passive": false
+    },
+    "Messaging": {
+      "domains": ["web.whatsapp.com", "teams.microsoft.com", "app.slack.com"],
+      "apps": ["WhatsApp", "Microsoft Teams", "Slack", "Messages"],
+      "phone_apps": ["WhatsApp", "Teams", "Slack", "Messages"],
+      "passive": false
+    }
+  }
+}

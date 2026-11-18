@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TimeTrack</title>
+<style>
+:root {
+  color-scheme: light;
+  --surface: #fcfcfb; --card: #ffffff; --line: #e6e5e1; --grid: #eeede9;
+  --text: #0b0b0b; --text-2: #52514e; --text-3: #8a8884;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --other: #b8b6b0; --good: #0ca30c; --bad: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface: #1a1a19; --card: #222221; --line: #33332f; --grid: #2c2c29;
+    --text: #f0efec; --text-2: #c3c2b7; --text-3: #8a8884;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #0ca30c; --s7: #9085e9; --s8: #e66767;
+    --other: #5a5955;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--surface); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif; padding: 20px 16px 48px; }
+header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
+.nav { display: flex; gap: 6px; align-items: center; }
+button { background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; font: inherit; cursor: pointer; }
+button:hover { border-color: var(--text-3); }
+.date { font-weight: 600; min-width: 150px; text-align: center; }
+.status { color: var(--text-3); font-size: 12px; margin-left: auto; }
+.status .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); margin-right: 6px; vertical-align: 1px; }
+.status .dot.on { background: var(--good); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; position: relative; }
+.tile .name { color: var(--text-2); font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+.tile .swatch { width: 10px; height: 10px; border-radius: 3px; }
+.tile .big { font-size: 30px; font-weight: 650; letter-spacing: -0.02em; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+.tile .sub { color: var(--text-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.tile.total .big { color: var(--text-2); }
+.grid2 { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 900px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px 10px; margin-bottom: 16px; }
+.card h2 { font-size: 13px; margin: 0 0 2px; font-weight: 600; }
+.card .hint { color: var(--text-3); font-size: 12px; margin-bottom: 10px; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); margin-top: 6px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--c); margin-right: 6px; vertical-align: -1px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--grid); font-size: 13px; }
+th { color: var(--text-3); font-weight: 600; font-size: 12px; }
+td.num, th.num { text-align: right; }
+td .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 7px; vertical-align: 0; }
+td.muted { color: var(--text-3); }
+.bar-track { background: var(--grid); height: 6px; border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; }
+#tip { position: fixed; pointer-events: none; background: var(--text); color: var(--surface); padding: 6px 9px; border-radius: 6px; font-size: 12px; opacity: 0; transition: opacity .08s; z-index: 10; white-space: nowrap; }
+.axis text { fill: var(--text-3); font-size: 11px; }
+.axis line { stroke: var(--grid); }
+.vlabel { fill: var(--text-2); font-size: 11px; font-variant-numeric: tabular-nums; }
+.empty { color: var(--text-3); font-size: 13px; padding: 20px 0; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>TimeTrack</h1>
+  <div class="nav">
+    <button id="prev" title="Previous day">‹</button>
+    <div class="date" id="dateLabel"></div>
+    <button id="next" title="Next day">›</button>
+    <button id="today">Today</button>
+  </div>
+  <div class="status" id="status"><span class="dot"></span>checking collector…</div>
+</header>
+
+<div class="tiles" id="tiles"></div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Last 7 days</h2>
+    <div class="hint">Minutes per day, tracked categories. Number above each bar is the day's opens.</div>
+    <div id="week"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+  <div class="card">
+    <h2>By hour</h2>
+    <div class="hint">When in the day it happens. Minutes per hour, tracked categories.</div>
+    <div id="hours"></div>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Everything, this day</h2>
+    <div class="hint">All apps and sites, longest first. Uncategorised items show their domain or app name.</div>
+    <div id="all"></div>
+  </div>
+  <div class="card">
+    <h2>Sessions</h2>
+    <div class="hint">Each time a tracked category was opened. A session ends after 60 seconds away.</div>
+    <div id="sessions"></div>
+  </div>
+</div>
+
+<div id="tip"></div>
+
+<script>
+const SLOTS = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
+let day = new Date(); day.setHours(0,0,0,0);
+const tip = document.getElementById('tip');
+const fmtHM = s => { const m = Math.round(s/60), h = Math.floor(m/60), mm = m%60; return h ? `${h}h ${String(mm).padStart(2,'0')}m` : `${m}m`; };
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const colorOf = (name, order) => { const i = order.indexOf(name); return i >= 0 && i < 8 ? `var(${SLOTS[i]})` : 'var(--other)'; };
+const niceMax = (maxSec, minStep) => { const steps=[5,10,15,30,60,120,180,240,300,360,480,600]; for (const st of steps) { if (st < minStep) continue; if (maxSec/60/st <= 5) return {step: st, max: Math.max(st, Math.ceil(maxSec/60/st)*st)}; } return {step: 600, max: Math.ceil(maxSec/60/600)*600}; };
+const tickLabel = min => min >= 60 ? (min % 60 ? `${Math.floor(min/60)}h${String(min%60).padStart(2,'0')}` : `${min/60}h`) : `${min}m`;
+const hm = ts => new Date(ts*1000).toTimeString().slice(0,5);
+
+function showTip(e, html) { tip.innerHTML = html; tip.style.opacity = 1; moveTip(e); }
+function moveTip(e) { tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY - 10) + 'px'; }
+function hideTip() { tip.style.opacity = 0; }
+function hover(el, html) { el.addEventListener('mouseenter', e => showTip(e, html)); el.addEventListener('mousemove', moveTip); el.addEventListener('mouseleave', hideTip); }
+
+async function load() {
+  const d = iso(day);
+  document.getElementById('dateLabel').textContent = day.toDateString() === new Date().toDateString() ? `Today, ${day.toLocaleDateString(undefined,{weekday:'short', day:'numeric', month:'short'})}` : day.toLocaleDateString(undefined,{weekday:'short', day:'numeric', month:'short', year:'numeric'});
+  const [dayData, weekData, st] = await Promise.all([
+    fetch(`/api/day?date=${d}`).then(r=>r.json()),
+    fetch(`/api/week?end=${d}`).then(r=>r.json()),
+    fetch(`/api/status`).then(r=>r.json()),
+  ]);
+  renderStatus(st); renderTiles(dayData); renderWeek(weekData); renderHours(dayData); renderAll(dayData); renderSessions(dayData);
+}
+
+function renderStatus(st) {
+  const el = document.getElementById('status');
+  const phone = st.phone_file_exists ? 'phone file found' : 'phone shortcut not set up yet';
+  el.innerHTML = `<span class="dot ${st.collector_alive?'on':''}"></span>collector ${st.collector_alive ? 'running' : 'NOT running'} · ${phone}`;
+}
+
+function renderTiles(s) {
+  const order = s.order;
+  const byName = Object.fromEntries(s.categories.map(c => [c.category, c]));
+  let html = '';
+  for (const name of order) {
+    const c = byName[name] || {seconds:0, opens:0, mac:0, phone:0};
+    html += `<div class="tile"><div class="name"><span class="swatch" style="background:${colorOf(name, order)}"></span>${esc(name)}</div>
+      <div class="big">${fmtHM(c.seconds)}</div>
+      <div class="sub">${c.opens} open${c.opens===1?'':'s'} · Mac ${fmtHM(c.mac)} · phone ${fmtHM(c.phone)}</div></div>`;
+  }
+  html += `<div class="tile total"><div class="name">All tracked screen time</div><div class="big">${fmtHM(s.total_seconds)}</div><div class="sub">every app and site, Mac + phone events</div></div>`;
+  document.getElementById('tiles').innerHTML = html;
+}
+
+function renderWeek(w) {
+  const order = w.order, days = w.days;
+  const W = 520, H = 220, padL = 40, padR = 8, padT = 22, padB = 26;
+  const maxSec = Math.max(60*5, ...days.map(d => order.reduce((a,n)=>a+((d.categories[n]||{}).seconds||0),0)));
+  const nm = niceMax(maxSec, 15), yMaxMin = nm.max;
+  const y = v => padT + (H-padT-padB) * (1 - v/(yMaxMin*60));
+  const bw = (W-padL-padR)/days.length, barW = Math.min(44, bw*0.6);
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Minutes per day by category">`;
+  for (let v=0; v<=yMaxMin; v+=nm.step) { g += `<g class="axis"><line x1="${padL}" x2="${W-padR}" y1="${y(v*60)}" y2="${y(v*60)}"/><text x="${padL-6}" y="${y(v*60)+4}" text-anchor="end">${tickLabel(v)}</text></g>`; }
+  days.forEach((d, i) => {
+    const x = padL + bw*i + (bw-barW)/2; let acc = 0, opens = 0;
+    order.forEach(n => {
+      const c = d.categories[n] || {seconds:0, opens:0}; opens += c.opens||0;
+      if (!c.seconds) return;
+      const y1 = y(acc + c.seconds), y0 = y(acc);
+      const h = Math.max(0, y0 - y1 - 2);
+      g += `<rect data-tip="${esc(d.weekday)} ${esc(d.date)} · ${esc(n)}: ${fmtHM(c.seconds)}, ${c.opens} opens" x="${x}" y="${y1+1}" width="${barW}" height="${h}" rx="2" fill="${colorOf(n, order)}"/>`;
+      acc += c.seconds;
+    });
+    if (acc) g += `<text class="vlabel" x="${x+barW/2}" y="${y(acc)-5}" text-anchor="middle">${opens}×</text>`;
+    g += `<text class="axis" x="${x+barW/2}" y="${H-8}" text-anchor="middle" style="fill:var(--text-3);font-size:11px">${d.weekday}</text>`;
+  });
+  g += '</svg>';
+  const el = document.getElementById('week'); el.innerHTML = g;
+  el.querySelectorAll('rect[data-tip]').forEach(r => hover(r, esc(r.dataset.tip)));
+  document.getElementById('legend').innerHTML = order.map(n => `<span style="--c:${colorOf(n, order)}">${esc(n)}</span>`).join('');
+}
+
+function renderHours(s) {
+  const order = s.order, hours = s.hours || {};
+  const W = 520, H = 220, padL = 40, padR = 8, padT = 12, padB = 26;
+  const totals = Array.from({length:24}, (_,h) => order.reduce((a,n)=>a+((hours[n]||[])[h]||0),0));
+  if (!totals.some(v=>v)) { document.getElementById('hours').innerHTML = '<div class="empty">Nothing tracked yet for this day.</div>'; return; }
+  const nm = niceMax(Math.max(...totals), 5), maxMin = nm.max;
+  const y = v => padT + (H-padT-padB) * (1 - v/(maxMin*60));
+  const bw = (W-padL-padR)/24, barW = bw-3;
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Minutes per hour by category">`;
+  for (let v=0; v<=maxMin; v+=nm.step) { g += `<g class="axis"><line x1="${padL}" x2="${W-padR}" y1="${y(v*60)}" y2="${y(v*60)}"/><text x="${padL-6}" y="${y(v*60)+4}" text-anchor="end">${tickLabel(v)}</text></g>`; }
+  for (let h=0; h<24; h++) {
+    const x = padL + bw*h + 1.5; let acc = 0;
+    order.forEach(n => {
+      const sec = (hours[n]||[])[h]||0; if (!sec) return;
+      const y1 = y(acc+sec), y0 = y(acc), hh = Math.max(0, y0-y1-1.5);
+      g += `<rect data-tip="${String(h).padStart(2,'0')}:00 · ${esc(n)}: ${fmtHM(sec)}" x="${x}" y="${y1+0.75}" width="${barW}" height="${hh}" rx="1.5" fill="${colorOf(n, order)}"/>`;
+      acc += sec;
+    });
+    if (h % 3 === 0) g += `<text x="${x+barW/2}" y="${H-8}" text-anchor="middle" style="fill:var(--text-3);font-size:11px">${h}</text>`;
+  }
+  g += '</svg>';
+  const el = document.getElementById('hours'); el.innerHTML = g;
+  el.querySelectorAll('rect[data-tip]').forEach(r => hover(r, esc(r.dataset.tip)));
+}
+
+function renderAll(s) {
+  const rows = s.categories.filter(c => c.seconds > 0).slice(0, 20);
+  if (!rows.length) { document.getElementById('all').innerHTML = '<div class="empty">No data for this day.</div>'; return; }
+  const max = rows[0].seconds;
+  let h = '<table><thead><tr><th>Category / site / app</th><th class="num">Time</th><th class="num">Opens</th><th style="width:30%"></th></tr></thead><tbody>';
+  for (const c of rows) {
+    const tracked = s.order.includes(c.category);
+    h += `<tr><td>${tracked ? `<span class="sw" style="background:${colorOf(c.category, s.order)}"></span>` : `<span class="sw" style="background:var(--other)"></span>`}${esc(c.category)}</td>
+      <td class="num">${fmtHM(c.seconds)}</td><td class="num muted">${c.opens}</td>
+      <td><div class="bar-track"><div class="bar-fill" style="width:${(100*c.seconds/max).toFixed(1)}%;background:${tracked ? colorOf(c.category, s.order) : 'var(--other)'}"></div></div></td></tr>`;
+  }
+  document.getElementById('all').innerHTML = h + '</tbody></table>';
+}
+
+function renderSessions(s) {
+  const rows = s.sessions.filter(x => s.order.includes(x.category)).sort((a,b)=>b.start-a.start);
+  if (!rows.length) { document.getElementById('sessions').innerHTML = '<div class="empty">No tracked sessions this day.</div>'; return; }
+  let h = '<table><thead><tr><th>When</th><th>What</th><th class="num">Length</th><th>Where</th><th>Doing</th></tr></thead><tbody>';
+  for (const x of rows.slice(0, 60)) {
+    h += `<tr><td class="muted">${hm(x.start)}</td><td><span class="sw" style="background:${colorOf(x.category, s.order)}"></span>${esc(x.category)}</td>
+      <td class="num">${fmtHM(x.seconds)}</td><td class="muted">${x.source === 'mac' ? 'Mac' : 'iPhone'}</td>
+      <td class="muted" title="${esc(x.titles.join(' · '))}">${esc((x.titles[0]||'').slice(0,60))}</td></tr>`;
+  }
+  document.getElementById('sessions').innerHTML = h + '</tbody></table>';
+}
+
+document.getElementById('prev').onclick = () => { day.setDate(day.getDate()-1); load(); };
+document.getElementById('next').onclick = () => { day.setDate(day.getDate()+1); load(); };
+document.getElementById('today').onclick = () => { day = new Date(); day.setHours(0,0,0,0); load(); };
+load();
+setInterval(() => { if (day.toDateString() === new Date().toDateString()) load(); }, 30000);
+</script>
+</body>
+</html>
