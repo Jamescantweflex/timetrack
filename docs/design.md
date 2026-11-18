@@ -66,8 +66,33 @@ broader effort to break the habit, not the whole fix.
 - **Dashboard.** Python stdlib HTTP server on 127.0.0.1:8765, one HTML page.
 - **Runs at login** via two launchd agents (collector, dashboard).
 
+## Phase 2, built the same day
+
+James left for a few days with "make your own decisions, give me something to
+test". So the baseline-week-first plan was collapsed: interrupts are built and
+switched on with default thresholds, to be tuned against the data.
+
+- **Interrupt at the entry.** A full-screen pause screen when a session of X
+  or YouTube starts: what you're here for, 10-second countdown, then "Go in"
+  (10 min allowance) or "Not now" (tab is sent to the dashboard). Grounded in
+  the one sec field study (Grüning et al., PNAS 2023; numbers unverified).
+- **Then limits.** Per sitting (X 10 min, YouTube 20) and per day (30 / 45).
+  Over the sitting: "5 more minutes" or "Done". Over the day: the screen says
+  so; "Override" stays available unless `block_after_daily` is on.
+- **Nothing silent.** Every screen and every answer is logged (decisions
+  table) and shown on the dashboard. Bounces are the metric of success.
+- **Separate agent.** The interrupter reads the collector's spans; it never
+  slows capture. Pure state machine (`engine.py`) with tests; Tk for the UI.
+- **Escape hatches.** `enabled: false`, `snooze N`, and the window closes on
+  its own if you've left the category for a minute.
+- **Phone.** Shortcuts "Ask for Input" as the pause, Screen Time app limits
+  as the hard stop. No custom app; iOS allows nothing better.
+
+Defaults are my calls (Assumption): 10 s pause, 10 min grace, 5 min extension,
+X 10/30, YouTube 20/45. Revisit after a week of data.
+
 ## Left to the builder
 
 - Exact dashboard layout, as long as today's X and YouTube minutes and opens
   are visible without scrolling.
-- Phase 2 design (interrupt mechanics) happens after a baseline week.
+- Tuning the interrupt thresholds once there is a week of real data.

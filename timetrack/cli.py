@@ -5,6 +5,10 @@
   ingest    pull new iPhone events from iCloud Drive now
   report    print today's (or --date YYYY-MM-DD) summary to the terminal
   status    is the collector alive? last span? db size?
+  interrupt run the interrupter (pause screens, limits; launchd runs this)
+  demo      show the pause screen once with fake numbers (--kind pause|session|daily)
+  decisions print recent pause-screen answers
+  snooze N  no pause screens for N minutes (0 = cancel). For meetings, screen shares.
 """
 from __future__ import annotations
 
@@ -12,6 +16,7 @@ import argparse
 import logging
 import sys
 from datetime import date, datetime
+from pathlib import Path
 
 from . import db, phone, rollup
 from .rules import Rules
@@ -51,6 +56,13 @@ def cmd_status(args) -> None:
               f"{datetime.fromtimestamp(r['end']).strftime('%H:%M:%S')} [{r['end_kind']}]")
     else:
         print("collector: no spans yet")
+    log_path = Path.home() / "Library" / "Logs" / "TimeTrack" / "interrupter.log"
+    if log_path.exists():
+        tail = log_path.read_text().strip().splitlines()[-1:] or [""]
+        print(f"interrupter: last log line: {tail[0][:100]}")
+    z = conn.execute("SELECT value FROM meta WHERE key='snooze_until'").fetchone()
+    if z and int(z["value"] or 0) > datetime.now().timestamp():
+        print(f"interrupts: SNOOZED until {datetime.fromtimestamp(int(z['value'])).strftime('%H:%M')}")
     p = phone.EVENTS_PATH
     print(f"phone file: {p} {'exists' if p.exists() else 'MISSING (set up the iPhone shortcut)'}")
 
@@ -68,6 +80,12 @@ def main(argv=None) -> None:
     rp.add_argument("--top", type=int, default=15)
     rp.add_argument("--sessions", action="store_true")
     sub.add_parser("status")
+    sub.add_parser("interrupt")
+    dp = sub.add_parser("demo")
+    dp.add_argument("--kind", default="pause", choices=["pause", "session", "daily"])
+    sub.add_parser("decisions")
+    zp = sub.add_parser("snooze")
+    zp.add_argument("minutes", type=int)
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stderr)
@@ -85,3 +103,19 @@ def main(argv=None) -> None:
         cmd_report(args)
     elif args.cmd == "status":
         cmd_status(args)
+    elif args.cmd == "interrupt":
+        from .interrupter import main as interrupt_main
+        interrupt_main()
+    elif args.cmd == "demo":
+        from .interrupter import demo
+        demo(args.kind)
+    elif args.cmd == "snooze":
+        import time as _t
+        until = int(_t.time()) + args.minutes * 60 if args.minutes > 0 else 0
+        db.connect().execute("INSERT OR REPLACE INTO meta(key,value) VALUES('snooze_until',?)", (str(until),))
+        print("interrupts snoozed until " + datetime.fromtimestamp(until).strftime("%H:%M") if until else "snooze cancelled")
+    elif args.cmd == "decisions":
+        conn = db.connect()
+        for r in conn.execute("SELECT * FROM decisions ORDER BY ts DESC LIMIT 30"):
+            print(datetime.fromtimestamp(r["ts"]).strftime("%a %H:%M"), f"{r['category']:<9}{r['kind']:<8}{r['choice']:<7}",
+                  f"sitting {r['session_seconds']//60}m today {r['today_seconds']//60}m", f"  {r['intention']}" if r["intention"] else "")

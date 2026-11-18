@@ -39,6 +39,13 @@ button:hover { border-color: var(--text-3); }
 .tile .big { font-size: 30px; font-weight: 650; letter-spacing: -0.02em; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
 .tile .sub { color: var(--text-3); font-size: 12px; font-variant-numeric: tabular-nums; }
 .tile.total .big { color: var(--text-2); }
+.tile .budget { margin-top: 8px; }
+.tile .budget .bar-track { margin-bottom: 4px; }
+.bounced { background: var(--card); border: 1px solid var(--good); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
+.pill { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.pill.bounce, .pill.done { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+.pill.go, .pill.more { background: color-mix(in srgb, var(--s2) 18%, transparent); color: var(--s2); }
+.pill.left { background: var(--grid); color: var(--text-3); }
 .grid2 { display: grid; grid-template-columns: 1fr; gap: 16px; }
 @media (min-width: 900px) { .grid2 { grid-template-columns: 1fr 1fr; } }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px 10px; margin-bottom: 16px; }
@@ -90,6 +97,14 @@ td.muted { color: var(--text-3); }
   </div>
 </div>
 
+<div id="bounced" class="bounced" style="display:none"></div>
+
+<div class="card">
+  <h2>Pause screens</h2>
+  <div class="hint" id="interruptsHint">Every time the pause screen came up this day, and what you chose. Bouncing is the win.</div>
+  <div id="decisions"></div>
+</div>
+
 <div class="grid2">
   <div class="card">
     <h2>Everything, this day</h2>
@@ -130,8 +145,36 @@ async function load() {
     fetch(`/api/week?end=${d}`).then(r=>r.json()),
     fetch(`/api/status`).then(r=>r.json()),
   ]);
-  renderStatus(st); renderTiles(dayData); renderWeek(weekData); renderHours(dayData); renderAll(dayData); renderSessions(dayData);
+  renderStatus(st); renderTiles(dayData); renderWeek(weekData); renderHours(dayData); renderAll(dayData); renderSessions(dayData); renderDecisions(dayData);
 }
+
+function renderDecisions(s) {
+  const rows = s.decisions || [];
+  const hint = document.getElementById('interruptsHint');
+  if (s.interrupts_enabled === false) hint.textContent = 'Interrupts are switched off in config/categories.json.';
+  const b = rows.filter(r => r.choice === 'bounce').length, g = rows.filter(r => r.choice === 'go').length,
+        d = rows.filter(r => r.choice === 'done').length, m = rows.filter(r => r.choice === 'more').length;
+  if (!rows.length) { document.getElementById('decisions').innerHTML = '<div class="empty">No pause screens this day.</div>'; return; }
+  let h = `<div class="sub" style="color:var(--text-2);margin-bottom:8px">${rows.length} prompts · bounced ${b} · went in ${g} · stopped at limit ${d} · took more time ${m}</div>`;
+  h += '<table><thead><tr><th>When</th><th>What</th><th>Why it came up</th><th>You chose</th><th>Intention you typed</th><th class="num">Sitting</th><th class="num">Day total</th></tr></thead><tbody>';
+  const kindText = {pause: 'opened it', session: 'sitting limit', daily: 'daily budget'};
+  const choiceText = {bounce: 'Not now', go: 'Went in', more: 'More time', done: 'Done', left: 'Walked away'};
+  for (const r of rows) {
+    h += `<tr><td class="muted">${hm(r.ts)}</td><td><span class="sw" style="background:${colorOf(r.category, s.order)}"></span>${esc(r.category)}</td>
+      <td class="muted">${kindText[r.kind]||r.kind}</td><td><span class="pill ${r.choice}">${choiceText[r.choice]||r.choice}</span></td>
+      <td>${esc(r.intention||'')}</td><td class="num muted">${fmtHM(r.session_seconds||0)}</td><td class="num muted">${fmtHM(r.today_seconds||0)}</td></tr>`;
+  }
+  document.getElementById('decisions').innerHTML = h + '</tbody></table>';
+}
+
+(function bouncedBanner() {
+  const q = new URLSearchParams(location.search);
+  if (!q.get('bounced')) return;
+  const el = document.getElementById('bounced');
+  el.style.display = 'block';
+  el.innerHTML = '<strong>Good call.</strong> You chose not now. Here is where the day stands.';
+  history.replaceState({}, '', '/');
+})();
 
 function renderStatus(st) {
   const el = document.getElementById('status');
@@ -145,9 +188,17 @@ function renderTiles(s) {
   let html = '';
   for (const name of order) {
     const c = byName[name] || {seconds:0, opens:0, mac:0, phone:0};
+    const lim = (s.limits||{})[name];
+    let budget = '';
+    if (lim && lim.daily_minutes) {
+      const pct = Math.min(100, 100*c.seconds/(lim.daily_minutes*60));
+      const over = c.seconds > lim.daily_minutes*60;
+      budget = `<div class="budget"><div class="bar-track"><div class="bar-fill" style="width:${pct.toFixed(1)}%;background:${over?'var(--bad)':colorOf(name, order)}"></div></div>
+        <div class="sub">${over ? 'over' : 'of'} ${lim.daily_minutes}m budget${over ? ` by ${fmtHM(c.seconds - lim.daily_minutes*60)}` : ''}</div></div>`;
+    }
     html += `<div class="tile"><div class="name"><span class="swatch" style="background:${colorOf(name, order)}"></span>${esc(name)}</div>
       <div class="big">${fmtHM(c.seconds)}</div>
-      <div class="sub">${c.opens} open${c.opens===1?'':'s'} · Mac ${fmtHM(c.mac)} · phone ${fmtHM(c.phone)}</div></div>`;
+      <div class="sub">${c.opens} open${c.opens===1?'':'s'} · Mac ${fmtHM(c.mac)} · phone ${fmtHM(c.phone)}</div>${budget}</div>`;
   }
   html += `<div class="tile total"><div class="name">All tracked screen time</div><div class="big">${fmtHM(s.total_seconds)}</div><div class="sub">every app and site, Mac + phone events</div></div>`;
   document.getElementById('tiles').innerHTML = html;

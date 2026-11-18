@@ -1,36 +1,112 @@
 {
-  "_comment": "Add a category by adding patterns. domains match by suffix (x.com matches mobile.x.com). apps match Mac app names exactly. phone_apps match the app name you type into the iPhone Shortcut. passive=true means no-input time still counts (video).",
-  "browsers": ["Arc", "Google Chrome", "Safari", "Brave Browser", "Microsoft Edge"],
-  "ignore_apps": ["loginwindow", "ScreenSaverEngine", "Dock", "SystemUIServer", "Window Server"],
+  "_comment": "Add a category by adding patterns. domains match by suffix (x.com matches mobile.x.com). apps match Mac app names exactly. phone_apps match the app name you type into the iPhone Shortcut. passive=true means no-input time still counts (video). limits per category: pause_on_open shows the pause screen each time a new session starts; session_minutes nudges after that long in one sitting; daily_minutes is the day's budget; block_after_daily removes the 'more time' button once the budget is spent.",
+  "interrupts": {
+    "enabled": true,
+    "pause_seconds": 10,
+    "grace_minutes": 10,
+    "extension_minutes": 5,
+    "session_gap_seconds": 60,
+    "digest_hour": 8,
+    "redirect_url": "http://127.0.0.1:8765/?bounced=1"
+  },
+  "browsers": [
+    "Arc",
+    "Google Chrome",
+    "Safari",
+    "Brave Browser",
+    "Microsoft Edge"
+  ],
+  "ignore_apps": [
+    "loginwindow",
+    "ScreenSaverEngine",
+    "Dock",
+    "SystemUIServer",
+    "Window Server",
+    "Python"
+  ],
   "categories": {
     "X": {
-      "domains": ["x.com", "twitter.com", "t.co"],
+      "domains": [
+        "x.com",
+        "twitter.com",
+        "t.co"
+      ],
       "apps": [],
-      "phone_apps": ["X"],
-      "passive": false
+      "phone_apps": [
+        "X"
+      ],
+      "passive": false,
+      "limits": {
+        "pause_on_open": true,
+        "session_minutes": 10,
+        "daily_minutes": 30,
+        "block_after_daily": false
+      }
     },
     "YouTube": {
-      "domains": ["youtube.com", "youtu.be", "music.youtube.com"],
+      "domains": [
+        "youtube.com",
+        "youtu.be",
+        "music.youtube.com"
+      ],
       "apps": [],
-      "phone_apps": ["YouTube"],
-      "passive": true
+      "phone_apps": [
+        "YouTube"
+      ],
+      "passive": true,
+      "limits": {
+        "pause_on_open": true,
+        "session_minutes": 20,
+        "daily_minutes": 45,
+        "block_after_daily": false
+      }
     },
     "Claude": {
-      "domains": ["claude.ai"],
-      "apps": ["Claude"],
-      "phone_apps": ["Claude"],
+      "domains": [
+        "claude.ai"
+      ],
+      "apps": [
+        "Claude"
+      ],
+      "phone_apps": [
+        "Claude"
+      ],
       "passive": false
     },
     "Email": {
-      "domains": ["mail.google.com", "outlook.office.com", "outlook.live.com"],
-      "apps": ["Mail", "Microsoft Outlook"],
-      "phone_apps": ["Mail", "Outlook"],
+      "domains": [
+        "mail.google.com",
+        "outlook.office.com",
+        "outlook.live.com"
+      ],
+      "apps": [
+        "Mail",
+        "Microsoft Outlook"
+      ],
+      "phone_apps": [
+        "Mail",
+        "Outlook"
+      ],
       "passive": false
     },
     "Messaging": {
-      "domains": ["web.whatsapp.com", "teams.microsoft.com", "app.slack.com"],
-      "apps": ["WhatsApp", "Microsoft Teams", "Slack", "Messages"],
-      "phone_apps": ["WhatsApp", "Teams", "Slack", "Messages"],
+      "domains": [
+        "web.whatsapp.com",
+        "teams.microsoft.com",
+        "app.slack.com"
+      ],
+      "apps": [
+        "WhatsApp",
+        "Microsoft Teams",
+        "Slack",
+        "Messages"
+      ],
+      "phone_apps": [
+        "WhatsApp",
+        "Teams",
+        "Slack",
+        "Messages"
+      ],
       "passive": false
     }
   }

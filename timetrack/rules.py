@@ -38,6 +38,7 @@ class Rules:
         self.browsers = set(cfg.get("browsers", []))
         self.ignore_apps = set(cfg.get("ignore_apps", []))
         self.categories = cfg.get("categories", {})
+        self.interrupts = cfg.get("interrupts", {})
         self._by_app = {}
         self._by_phone_app = {}
         self._domain_rules = []
@@ -67,6 +68,9 @@ class Rules:
                     return name
             return domain
         return self._by_app.get(app, app)
+
+    def limits(self, category: str) -> dict | None:
+        return self.categories.get(category, {}).get("limits")
 
     def tracked_names(self) -> list[str]:
         return list(self.categories.keys())

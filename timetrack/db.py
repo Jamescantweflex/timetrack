@@ -32,6 +32,18 @@ CREATE TABLE IF NOT EXISTS phone_raw (
     line    TEXT PRIMARY KEY          -- exact JSONL line, for idempotent ingest
 );
 
+CREATE TABLE IF NOT EXISTS decisions (
+    id        INTEGER PRIMARY KEY,
+    ts        INTEGER NOT NULL,
+    category  TEXT NOT NULL,
+    kind      TEXT NOT NULL,     -- pause | session | daily
+    choice    TEXT NOT NULL,     -- go | bounce | more | done | left
+    intention TEXT,
+    session_seconds INTEGER,
+    today_seconds   INTEGER
+);
+CREATE INDEX IF NOT EXISTS decisions_ts ON decisions(ts);
+
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT

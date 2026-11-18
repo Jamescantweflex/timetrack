@@ -64,11 +64,23 @@ class Handler(BaseHTTPRequestHandler):
                     s["hours"] = h["hours"]
                     s["order"] = rules.tracked_names()
                     s["passive"] = [c for c in rules.tracked_names() if rules.is_passive(c)]
+                    s["limits"] = {c: rules.limits(c) for c in rules.tracked_names() if rules.limits(c)}
+                    d0, d1 = rollup.day_bounds(d)
+                    s["decisions"] = [dict(r) for r in conn.execute(
+                        "SELECT ts,category,kind,choice,intention,session_seconds,today_seconds FROM decisions "
+                        "WHERE ts>=? AND ts<? ORDER BY ts DESC", (d0, d1))]
+                    s["interrupts_enabled"] = bool(rules.interrupts.get("enabled", True))
                     self._json(s)
                 elif u.path == "/api/week":
                     end = _date(qs, "end")
                     self._json({"days": rollup.week(conn, end, rules, int(qs.get("days", ["7"])[0])),
                                 "order": rules.tracked_names()})
+                elif u.path == "/api/decisions":
+                    days = int(qs.get("days", ["7"])[0])
+                    d0, _ = rollup.day_bounds(date.today() - timedelta(days=days - 1))
+                    rows = conn.execute("SELECT date(ts,'unixepoch','localtime') d, category, choice, COUNT(*) n "
+                                        "FROM decisions WHERE ts>=? GROUP BY 1,2,3", (d0,)).fetchall()
+                    self._json({"rows": [dict(r) for r in rows]})
                 elif u.path == "/api/status":
                     r = conn.execute("SELECT end FROM spans WHERE source='mac' ORDER BY end DESC LIMIT 1").fetchone()
                     import time

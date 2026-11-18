@@ -42,7 +42,7 @@ def parse_line(line: str) -> dict | None:
         obj = json.loads(line)
         ts = parse_ts(str(obj["ts"]))
         app = str(obj["app"]).strip()
-        event = str(obj["event"]).strip().lower()
+        event = str(obj["event"]).strip().lower().split(" ")[0]   # "open my reason" -> "open"
     except (ValueError, KeyError, TypeError) as e:
         log.warning("bad phone line %r: %s", line[:120], e)
         return None

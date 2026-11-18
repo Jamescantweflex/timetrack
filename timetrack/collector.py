@@ -18,7 +18,7 @@ from .rules import Rules, domain_of
 
 log = logging.getLogger("timetrack.collector")
 
-POLL_SECONDS = 5
+POLL_SECONDS = 3
 IDLE_ACTIVE_SECONDS = 180        # no input for 3 min -> stop counting
 IDLE_PASSIVE_SECONDS = 3600      # ...unless watching video: allow 60 min
 GAP_SECONDS = 3 * POLL_SECONDS   # wall-clock jump bigger than this = Mac slept

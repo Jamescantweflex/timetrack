@@ -4,14 +4,22 @@ Where does my tech time go. Local only. Mac collector + iPhone Shortcuts events
 → SQLite → a dashboard at http://127.0.0.1:8765.
 
 Design: `docs/design.md`. iPhone setup: `docs/iphone-shortcuts.md`.
+What to test: `docs/testing-guide.md`.
+
+Three background agents: **collector** (what's in front, every 3 s),
+**interrupter** (pause screen on opening X/YouTube, sitting and daily limits,
+morning digest), **dashboard** (the web page).
 
 ## Run
 
 ```bash
-./install.sh            # installs two launchd agents (collector + dashboard), runs at login
+./install.sh            # installs three launchd agents, runs at login
 python3 -m timetrack status
 python3 -m timetrack report --sessions
 python3 -m timetrack report --date 2026-11-18
+python3 -m timetrack decisions           # pause-screen answers
+python3 -m timetrack snooze 90           # no pause screens for 90 min
+python3 -m timetrack demo --kind pause   # see the screen with fake numbers
 ./install.sh uninstall
 ```
 
@@ -30,7 +38,12 @@ file on every request.
 python3 tests/test_collector.py
 ```
 
-## Phase 2 (after a baseline week)
+## Interrupts
 
-Interrupts: a pause screen on open, nudges after N minutes, Screen Time limits
-on the phone. Not built yet, on purpose.
+`interrupts` and each category's `limits` in `config/categories.json`. Live
+reload. `enabled: false` turns everything off. The engine is pure and tested
+(`tests/test_engine.py`); the UI is Tk, full-screen, forced to the front.
+
+```bash
+python3 tests/test_engine.py
+```

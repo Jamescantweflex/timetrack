@@ -56,6 +56,22 @@ That's it. Any other app later: two more automations with its name. Then add
 the same name under `phone_apps` in `config/categories.json` on the Mac (or
 leave it; it shows under its own name anyway).
 
+## Part 3: the phone-side pause (optional, recommended)
+
+The Mac pause screen can't appear on the phone, but the same automation can
+make you stop and say why before the feed gets you. In each **Is Opened**
+automation, add these two actions **before** the Run Shortcut action:
+
+1. **Ask for Input** — Prompt: `What are you here for?`, Input Type: Text.
+   (The feed is already loading underneath; this is the pause.)
+2. Leave the rest as is. If you want the intention logged, change the Text
+   action to `YouTube open` followed by a space and the *Provided Input*
+   variable; the Mac ignores anything after the second word for now.
+
+For a hard stop, use the thing Apple already built: **Settings → Screen Time →
+App Limits → Add Limit**: X 30 min, YouTube 45 min, and turn on **Block at End
+of Limit**. Those limits match the Mac defaults in `config/categories.json`.
+
 ## Known limits
 
 - "Closed" fires when you leave the app, including switching to another app or
