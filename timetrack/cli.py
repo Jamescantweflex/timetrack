@@ -9,6 +9,7 @@
   demo      show the pause screen once with fake numbers (--kind pause|session|daily)
   decisions print recent pause-screen answers
   snooze N  no pause screens for N minutes (0 = cancel). For meetings, screen shares.
+  probe     trigger every macOS permission prompt the agents need (first install)
 """
 from __future__ import annotations
 
@@ -84,6 +85,7 @@ def main(argv=None) -> None:
     dp = sub.add_parser("demo")
     dp.add_argument("--kind", default="pause", choices=["pause", "session", "daily"])
     sub.add_parser("decisions")
+    sub.add_parser("probe")
     zp = sub.add_parser("snooze")
     zp.add_argument("minutes", type=int)
     args = parser.parse_args(argv)
@@ -109,6 +111,8 @@ def main(argv=None) -> None:
     elif args.cmd == "demo":
         from .interrupter import demo
         demo(args.kind)
+    elif args.cmd == "probe":
+        from . import probe  # noqa: F401  (runs on import)
     elif args.cmd == "snooze":
         import time as _t
         until = int(_t.time()) + args.minutes * 60 if args.minutes > 0 else 0

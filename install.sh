@@ -1,31 +1,69 @@
 #!/bin/zsh
-# Install (or reinstall) the launchd agents so TimeTrack runs at login.
-# Usage: ./install.sh            install/restart all three
-#        ./install.sh uninstall  stop and remove
+# Install (or reinstall) TimeTrack's launchd agents for the current user, on any Mac.
+# Usage: ./install.sh            install/restart all three agents
+#        ./install.sh uninstall  stop and remove them (data is kept)
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 AGENTS="$HOME/Library/LaunchAgents"
-mkdir -p "$AGENTS" "$HOME/Library/Logs/TimeTrack"
+LOGS="$HOME/Library/Logs/TimeTrack"
+mkdir -p "$AGENTS" "$LOGS"
+PY="$(command -v python3)"
+if ! "$PY" -c "import sys; assert sys.version_info >= (3, 10); import tkinter, sqlite3" 2>/dev/null; then
+  echo "Need Python 3.10+ with tkinter. Install from https://www.python.org/downloads/macos/ and re-run." >&2
+  exit 1
+fi
+LABEL_PREFIX="com.timetrack.$(id -un)"
+
+write_plist() {   # name, args..., writes $AGENTS/$label.plist
+  local name="$1"; shift
+  local label="$LABEL_PREFIX.$name"
+  local args=""; for a in "$@"; do args+="    <string>$a</string>\n"; done
+  local extra=""
+  [[ "$name" == "interrupter" ]] && extra="  <key>ProcessType</key><string>Interactive</string>\n  <key>EnvironmentVariables</key><dict><key>PYTHONUNBUFFERED</key><string>1</string></dict>\n"
+  printf '%b' "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\"><dict>
+  <key>Label</key><string>$label</string>
+  <key>ProgramArguments</key><array>
+    <string>$PY</string>
+$args  </array>
+  <key>WorkingDirectory</key><string>$HERE</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+$extra  <key>StandardOutPath</key><string>$LOGS/$name.log</string>
+  <key>StandardErrorPath</key><string>$LOGS/$name.log</string>
+</dict></plist>
+" > "$AGENTS/$label.plist"
+}
 
 for name in collector dashboard interrupter; do
-  label="com.timetrack.legacy.$name"
+  label="$LABEL_PREFIX.$name"
   launchctl bootout "gui/$UID/$label" 2>/dev/null || true
-  if [[ "${1:-}" == "uninstall" ]]; then
-    rm -f "$AGENTS/$label.plist"; echo "removed $label"; continue
-  fi
-  cp "$HERE/launchd/$label.plist" "$AGENTS/$label.plist"
+  # older installs used a different label
+  launchctl bootout "gui/$UID/com.timetrack.legacy.$name" 2>/dev/null || true
+  rm -f "$AGENTS/com.timetrack.legacy.$name.plist"
+  if [[ "${1:-}" == "uninstall" ]]; then rm -f "$AGENTS/$label.plist"; echo "removed $label"; continue; fi
+  case $name in
+    collector)   write_plist collector -m timetrack collect ;;
+    dashboard)   write_plist dashboard -m timetrack serve --port 8765 ;;
+    interrupter) write_plist interrupter -m timetrack interrupt ;;
+  esac
   ok=0
-  for try in 1 2 3 4 5 6; do          # launchd needs a beat after bootout
+  for try in 1 2 3 4 5 6; do
     if launchctl bootstrap "gui/$UID" "$AGENTS/$label.plist" 2>/dev/null; then ok=1; break; fi
     sleep 1
   done
-  if [[ $ok == 1 ]]; then echo "started $label"; else echo "FAILED to start $label"; fi
+  [[ $ok == 1 ]] && echo "started $label" || echo "FAILED to start $label (see $LOGS/$name.log)"
 done
 
 if [[ "${1:-}" != "uninstall" ]]; then
   sleep 2
   for name in collector dashboard interrupter; do
-    printf "%-12s " "$name"; launchctl print "gui/$UID/com.timetrack.legacy.$name" 2>/dev/null | grep -E "^\s+pid = " | head -1 || echo "not running"
+    printf "%-12s " "$name"; launchctl print "gui/$UID/$LABEL_PREFIX.$name" 2>/dev/null | grep -E "^\s+pid = " | head -1 || echo "not running"
   done
-  echo "dashboard: http://127.0.0.1:8765"
+  echo
+  echo "Dashboard: http://127.0.0.1:8765"
+  echo "First run: macOS will ask to let python3 control System Events and your browser. Click Allow each time."
+  echo "To trigger all those prompts now:  $PY -m timetrack probe"
 fi

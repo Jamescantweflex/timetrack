@@ -225,6 +225,19 @@ class Collector:
             self._close(now, "switch")
             self._open(now, f, domain)
 
+    def _reload_rules_if_changed(self) -> None:
+        from .rules import CONFIG_PATH
+        try:
+            m = CONFIG_PATH.stat().st_mtime
+        except OSError:
+            return
+        if m != getattr(self, "_rules_mtime", None):
+            self._rules_mtime = m
+            try:
+                self.rules = Rules()
+            except Exception:
+                log.exception("config reload failed, keeping old rules")
+
     def run(self) -> None:
         def stop(*_):
             self.running = False
@@ -237,6 +250,7 @@ class Collector:
         try:
             while self.running:
                 try:
+                    self._reload_rules_if_changed()
                     self.tick()
                 except Exception:  # keep running no matter what
                     log.exception("tick failed")

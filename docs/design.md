@@ -91,6 +91,24 @@ switched on with default thresholds, to be tuned against the data.
 Defaults are my calls (Assumption): 10 s pause, 10 min grace, 5 min extension,
 X 10/30, YouTube 20/45. Revisit after a week of data.
 
+## Changes after James's first test (24 Nov 2026)
+
+- Free-text "What are you here for?" replaced by two buttons: **Wasting time**
+  (stop; tab goes to the dashboard) and **Being productive** (in for 10 min,
+  then re-asked every 10 min). James: the answer was always "wasting time".
+- **Meditation gate**: the first "productive" of the day asks "Have you
+  meditated today?"; No means stop and meditate first; Yes is remembered for
+  the day.
+- An **unanswered** screen counts as wasting time after 60 s and closes X. It
+  no longer vanishes: the vanish was a bug (with its own window in front the
+  collector saw no X, so the interrupter thought James had left).
+- **Watch list on the dashboard**: which sites/apps get the screen, limits and
+  global timings are edited on the page and saved to the config file; all
+  three agents hot-reload it. Built because James is handing the tool to his
+  team as a time tracker and "net nanny".
+- Installer made portable (per-user labels, detected python3, no hard-coded
+  paths) so teammates can run `./install.sh` on their own Mac.
+
 ## Left to the builder
 
 - Exact dashboard layout, as long as today's X and YouTube minutes and opens

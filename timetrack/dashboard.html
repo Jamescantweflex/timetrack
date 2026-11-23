@@ -62,6 +62,19 @@ td .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; mar
 td.muted { color: var(--text-3); }
 .bar-track { background: var(--grid); height: 6px; border-radius: 3px; overflow: hidden; }
 .bar-fill { height: 100%; border-radius: 3px; }
+.settings input[type=text], .settings input[type=number] { font: inherit; font-size: 13px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--text); width: 100%; }
+.settings input[type=number] { width: 64px; text-align: right; }
+.settings td, .settings th { vertical-align: middle; padding: 5px 6px; }
+#catTable { overflow-x: auto; }
+#catTable table { min-width: 860px; }
+.settings .globals { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; margin: 6px 0 14px; font-size: 13px; }
+.settings .globals label { display: flex; align-items: center; gap: 6px; color: var(--text-2); }
+.settings .actions { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+button.primary { background: var(--s1); color: #fff; border-color: var(--s1); }
+button.small { padding: 2px 8px; font-size: 12px; }
+button.danger { color: var(--bad); }
+.saved { color: var(--good); font-size: 13px; }
+.err { color: var(--bad); font-size: 13px; }
 #tip { position: fixed; pointer-events: none; background: var(--text); color: var(--surface); padding: 6px 9px; border-radius: 6px; font-size: 12px; opacity: 0; transition: opacity .08s; z-index: 10; white-space: nowrap; }
 .axis text { fill: var(--text-3); font-size: 11px; }
 .axis line { stroke: var(--grid); }
@@ -115,6 +128,18 @@ td.muted { color: var(--text-3); }
     <h2>Sessions</h2>
     <div class="hint">Each time a tracked category was opened. A session ends after 60 seconds away.</div>
     <div id="sessions"></div>
+  </div>
+</div>
+
+<div class="card settings" id="settingsCard">
+  <h2>Watch list and settings</h2>
+  <div class="hint">Which sites and apps get the "productive or wasting time?" screen, and the limits behind it. Saves straight to the config file; the agents pick it up within seconds.</div>
+  <div class="globals" id="globals"></div>
+  <div id="catTable"></div>
+  <div class="actions">
+    <button id="addCat">+ Add a site or app</button>
+    <button id="saveCfg" class="primary">Save</button>
+    <span id="saveMsg"></span>
   </div>
 </div>
 
@@ -266,11 +291,14 @@ function renderAll(s) {
   let h = '<table><thead><tr><th>Category / site / app</th><th class="num">Time</th><th class="num">Opens</th><th style="width:30%"></th></tr></thead><tbody>';
   for (const c of rows) {
     const tracked = s.order.includes(c.category);
-    h += `<tr><td>${tracked ? `<span class="sw" style="background:${colorOf(c.category, s.order)}"></span>` : `<span class="sw" style="background:var(--other)"></span>`}${esc(c.category)}</td>
+    const isDomain = /\./.test(c.category);
+    const watchBtn = tracked ? '' : ` <button class="small watch" data-label="${esc(c.category)}" data-domain="${isDomain ? 1 : 0}" title="Add the pause screen for this">Watch</button>`;
+    h += `<tr><td>${tracked ? `<span class="sw" style="background:${colorOf(c.category, s.order)}"></span>` : `<span class="sw" style="background:var(--other)"></span>`}${esc(c.category)}${watchBtn}</td>
       <td class="num">${fmtHM(c.seconds)}</td><td class="num muted">${c.opens}</td>
       <td><div class="bar-track"><div class="bar-fill" style="width:${(100*c.seconds/max).toFixed(1)}%;background:${tracked ? colorOf(c.category, s.order) : 'var(--other)'}"></div></div></td></tr>`;
   }
   document.getElementById('all').innerHTML = h + '</tbody></table>';
+  document.querySelectorAll('#all button.watch').forEach(b => b.onclick = () => watchQuick(b.dataset.label, b.dataset.domain === '1'));
 }
 
 function renderSessions(s) {
@@ -284,6 +312,85 @@ function renderSessions(s) {
   }
   document.getElementById('sessions').innerHTML = h + '</tbody></table>';
 }
+
+// ---------------- settings ----------------
+let CFG = null;
+async function loadConfig() { CFG = await fetch('/api/config').then(r => r.json()); renderSettings(); }
+function renderSettings() {
+  const it = CFG.interrupts || {};
+  document.getElementById('globals').innerHTML = `
+    <label><input type="checkbox" id="g_enabled" ${it.enabled !== false ? 'checked' : ''}> Pause screens on</label>
+    <label>Countdown <input type="number" id="g_pause" value="${it.pause_seconds ?? 10}" min="0" max="120"> s</label>
+    <label>"Productive" buys <input type="number" id="g_grace" value="${it.grace_minutes ?? 10}" min="1"> min</label>
+    <label>then re-asks every <input type="number" id="g_ext" value="${it.extension_minutes ?? 10}" min="1"> min</label>
+    <label>No answer after <input type="number" id="g_timeout" value="${it.timeout_seconds ?? 60}" min="10"> s = wasting time</label>
+    <label><input type="checkbox" id="g_med" ${it.meditation_gate !== false ? 'checked' : ''}> Ask "meditated today?" once a day</label>`;
+  const names = Object.keys(CFG.categories || {});
+  let h = '<table><thead><tr><th>Name</th><th>Websites (comma separated)</th><th>Mac apps</th><th>iPhone apps</th><th title="Counts time with no keyboard or mouse, for video">Video</th><th title="Show the productive-or-wasting screen when a session starts">Pause screen</th><th class="num">Per sitting (min)</th><th class="num">Per day (min)</th><th title="Once over the daily budget, no override">Hard</th><th></th></tr></thead><tbody>';
+  names.forEach((n, i) => {
+    const c = CFG.categories[n], l = c.limits || null;
+    h += `<tr data-i="${i}">
+      <td><input type="text" class="c_name" value="${esc(n)}" style="min-width:90px"></td>
+      <td><input type="text" class="c_domains" value="${esc((c.domains||[]).join(', '))}" style="min-width:160px"></td>
+      <td><input type="text" class="c_apps" value="${esc((c.apps||[]).join(', '))}" style="min-width:110px"></td>
+      <td><input type="text" class="c_phone" value="${esc((c.phone_apps||[]).join(', '))}" style="min-width:90px"></td>
+      <td><input type="checkbox" class="c_passive" ${c.passive ? 'checked' : ''}></td>
+      <td><input type="checkbox" class="c_pause" ${l && l.pause_on_open ? 'checked' : ''}></td>
+      <td class="num"><input type="number" class="c_sess" value="${l ? l.session_minutes : ''}" min="0" placeholder="–"></td>
+      <td class="num"><input type="number" class="c_day" value="${l ? l.daily_minutes : ''}" min="0" placeholder="–"></td>
+      <td><input type="checkbox" class="c_hard" ${l && l.block_after_daily ? 'checked' : ''}></td>
+      <td><button class="small danger c_del" title="Remove">✕</button></td></tr>`;
+  });
+  document.getElementById('catTable').innerHTML = h + '</tbody></table>';
+  document.querySelectorAll('.c_del').forEach(b => b.onclick = e => { e.target.closest('tr').remove(); });
+}
+function readSettingsForm() {
+  const cats = {};
+  document.querySelectorAll('#catTable tbody tr').forEach(tr => {
+    const g = cls => tr.querySelector('.' + cls);
+    const name = g('c_name').value.trim(); if (!name) return;
+    const sess = g('c_sess').value, day = g('c_day').value, pause = g('c_pause').checked, hard = g('c_hard').checked;
+    const c = { domains: g('c_domains').value, apps: g('c_apps').value, phone_apps: g('c_phone').value, passive: g('c_passive').checked };
+    if (pause || sess || day || hard) c.limits = { pause_on_open: pause, session_minutes: +sess || 0, daily_minutes: +day || 0, block_after_daily: hard };
+    cats[name] = c;
+  });
+  return { interrupts: {
+      enabled: document.getElementById('g_enabled').checked, pause_seconds: +document.getElementById('g_pause').value,
+      grace_minutes: +document.getElementById('g_grace').value, extension_minutes: +document.getElementById('g_ext').value,
+      timeout_seconds: +document.getElementById('g_timeout').value, meditation_gate: document.getElementById('g_med').checked },
+    categories: cats };
+}
+async function saveConfig(payload) {
+  const msg = document.getElementById('saveMsg');
+  msg.className = ''; msg.textContent = 'Saving…';
+  const r = await fetch('/api/config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+  const j = await r.json();
+  if (!r.ok) { msg.className = 'err'; msg.textContent = 'Not saved: ' + (j.error || r.status); return false; }
+  CFG = j.config; renderSettings(); load();
+  msg.className = 'saved'; msg.textContent = 'Saved ' + new Date().toTimeString().slice(0,5);
+  setTimeout(() => { if (msg.textContent.startsWith('Saved')) msg.textContent = ''; }, 4000);
+  return true;
+}
+document.getElementById('saveCfg').onclick = () => saveConfig(readSettingsForm());
+document.getElementById('addCat').onclick = () => {
+  const payload = readSettingsForm();           // keep any unsaved edits
+  CFG = { ...CFG, categories: payload.categories, interrupts: { ...CFG.interrupts, ...payload.interrupts } };
+  // normalise strings -> arrays for rendering
+  for (const c of Object.values(CFG.categories)) for (const k of ['domains','apps','phone_apps']) if (typeof c[k] === 'string') c[k] = c[k].split(',').map(x=>x.trim()).filter(Boolean);
+  CFG.categories['New'] = { domains: [], apps: [], phone_apps: [], passive: false, limits: { pause_on_open: true, session_minutes: 10, daily_minutes: 30, block_after_daily: false } };
+  renderSettings();
+  const last = document.querySelector('#catTable tbody tr:last-child .c_name'); last.select(); last.scrollIntoView({block: 'center'});
+};
+// One click "Watch" from the everything table: new watched category for that domain/app.
+async function watchQuick(label, isDomain) {
+  const payload = readSettingsForm();
+  const name = isDomain ? label.replace(/^www\./, '').split('.').slice(-2, -1)[0] || label : label;
+  const nice = name.charAt(0).toUpperCase() + name.slice(1);
+  payload.categories[nice] = { domains: isDomain ? label : '', apps: isDomain ? '' : label, phone_apps: '', passive: false,
+                               limits: { pause_on_open: true, session_minutes: 10, daily_minutes: 30, block_after_daily: false } };
+  if (await saveConfig(payload)) document.getElementById('settingsCard').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+loadConfig();
 
 document.getElementById('prev').onclick = () => { day.setDate(day.getDate()-1); load(); };
 document.getElementById('next').onclick = () => { day.setDate(day.getDate()+1); load(); };

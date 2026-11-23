@@ -25,7 +25,33 @@ python3 -m timetrack demo --kind pause   # see the screen with fake numbers
 
 Logs: `~/Library/Logs/TimeTrack/`. Data: `~/Library/Application Support/TimeTrack/timetrack.db`.
 
+## Install for a teammate (any Mac)
+
+1. Install Python 3 from python.org (the macOS installer includes tkinter).
+2. Copy this folder anywhere, e.g. `~/timetrack`, and run:
+
+```bash
+./install.sh
+```
+
+3. Run the permission probe and click **Allow** on each macOS dialog
+   (System Events, Accessibility, your browser):
+
+```bash
+python3 -m timetrack probe
+```
+
+4. Open http://127.0.0.1:8765, scroll to **Watch list and settings**, and
+   choose which sites and apps get the "productive or wasting time?" screen.
+   Or click **Watch** next to anything in the day's list.
+
+Everything stays on that Mac. Nothing is sent anywhere. The iPhone part is
+optional: `docs/iphone-shortcuts.md`.
+
 ## Add something to track
+
+Easiest: the **Watch list and settings** panel on the dashboard. Or edit the
+file directly:
 
 Edit `config/categories.json`. Domains match by suffix, apps by Mac app name,
 `phone_apps` by the name used in the iPhone shortcut. `passive: true` means

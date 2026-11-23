@@ -10,7 +10,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import db, phone, rollup
-from .rules import Rules
+from .rules import CONFIG_PATH, Rules, load as load_config
 
 log = logging.getLogger("timetrack.dashboard")
 HTML_PATH = Path(__file__).resolve().parent / "dashboard.html"
@@ -37,6 +37,25 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
+
+    def do_POST(self):
+        u = urlsplit(self.path)
+        try:
+            n = int(self.headers.get("Content-Length", "0"))
+            body = json.loads(self.rfile.read(n) or b"{}")
+            if u.path == "/api/config":
+                with _lock:
+                    cfg = validate_config(body, load_config())
+                    save_config(cfg)
+                log.info("config saved from dashboard: %d categories", len(cfg["categories"]))
+                self._json({"ok": True, "config": cfg})
+            else:
+                self._json({"error": "not found"}, 404)
+        except (ValueError, TypeError, KeyError) as e:
+            self._json({"error": str(e)}, 400)
+        except Exception as e:
+            log.exception("POST failed")
+            self._json({"error": str(e)}, 500)
 
     def do_GET(self):
         u = urlsplit(self.path)
@@ -83,6 +102,8 @@ class Handler(BaseHTTPRequestHandler):
                     rows = conn.execute("SELECT date(ts,'unixepoch','localtime') d, category, choice, COUNT(*) n "
                                         "FROM decisions WHERE ts>=? GROUP BY 1,2,3", (d0,)).fetchall()
                     self._json({"rows": [dict(r) for r in rows]})
+                elif u.path == "/api/config":
+                    self._json(load_config())
                 elif u.path == "/api/status":
                     r = conn.execute("SELECT end FROM spans WHERE source='mac' ORDER BY end DESC LIMIT 1").fetchone()
                     import time
@@ -95,6 +116,68 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             log.exception("request failed")
             self._json({"error": str(e)}, 500)
+
+
+def _clean_list(v, lower=False):
+    if isinstance(v, str):
+        v = v.replace("\n", ",").split(",")
+    out = []
+    for x in v or []:
+        x = str(x).strip()
+        if lower:
+            x = x.lower()
+            if x.startswith("www."):
+                x = x[4:]
+        if x and x not in out:
+            out.append(x)
+    return out
+
+
+def validate_config(new: dict, current: dict) -> dict:
+    """Accept only the fields the settings panel edits; keep everything else as is."""
+    cfg = json.loads(json.dumps(current))
+    it = new.get("interrupts", {})
+    cur_it = cfg.setdefault("interrupts", {})
+    for key, lo, hi in (("pause_seconds", 0, 120), ("grace_minutes", 1, 240), ("extension_minutes", 1, 240),
+                        ("timeout_seconds", 10, 600), ("digest_hour", 0, 23)):
+        if key in it:
+            cur_it[key] = max(lo, min(hi, int(it[key])))
+    for key in ("enabled", "meditation_gate"):
+        if key in it:
+            cur_it[key] = bool(it[key])
+    if "categories" in new:
+        cats = {}
+        for name, spec in new["categories"].items():
+            name = str(name).strip()[:40]
+            if not name:
+                continue
+            c = {
+                "domains": _clean_list(spec.get("domains"), lower=True),
+                "apps": _clean_list(spec.get("apps")),
+                "phone_apps": _clean_list(spec.get("phone_apps")),
+                "passive": bool(spec.get("passive")),
+            }
+            if not (c["domains"] or c["apps"] or c["phone_apps"]):
+                continue
+            lim = spec.get("limits")
+            if lim:
+                c["limits"] = {
+                    "pause_on_open": bool(lim.get("pause_on_open", True)),
+                    "session_minutes": max(0, min(600, int(lim.get("session_minutes") or 0))),
+                    "daily_minutes": max(0, min(1440, int(lim.get("daily_minutes") or 0))),
+                    "block_after_daily": bool(lim.get("block_after_daily")),
+                }
+            cats[name] = c
+        if not cats:
+            raise ValueError("at least one category is required")
+        cfg["categories"] = cats
+    return cfg
+
+
+def save_config(cfg: dict) -> None:
+    tmp = CONFIG_PATH.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(cfg, indent=2) + "\n")
+    tmp.replace(CONFIG_PATH)
 
 
 def serve(port: int = 8765) -> None:

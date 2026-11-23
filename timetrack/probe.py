@@ -1,4 +1,4 @@
-"""Trigger every macOS permission prompt the collector will ever need, in one go.
+"""Trigger every macOS permission prompt the agents will ever need, in one go.
 Run under launchd so the prompts are attributed to the same python3 the agent uses."""
 import subprocess, sys, time
 from .collector import CHROMIUM_SCRIPT, SAFARI_SCRIPT, WINDOW_TITLE_SCRIPT, FRONT_APP_SCRIPT
