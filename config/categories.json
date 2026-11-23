@@ -1,13 +1,15 @@
 {
-  "_comment": "Add a category by adding patterns. domains match by suffix (x.com matches mobile.x.com). apps match Mac app names exactly. phone_apps match the app name you type into the iPhone Shortcut. passive=true means no-input time still counts (video). limits per category: pause_on_open shows the pause screen each time a new session starts; session_minutes nudges after that long in one sitting; daily_minutes is the day's budget; block_after_daily removes the 'more time' button once the budget is spent.",
+  "_comment": "Add a category by adding patterns. domains match by suffix (x.com matches mobile.x.com). apps match Mac app names exactly. phone_apps match the app name you type into the iPhone Shortcut. passive=true means no-input time still counts (video). limits per category: pause_on_open shows the pause screen each time a new session starts; session_minutes nudges after that long in one sitting; daily_minutes is the day's budget; block_after_daily removes the 'more time' button once the budget is spent. interrupts: grace_minutes = how long 'productive' buys before it re-asks; extension_minutes = same for the re-ask; timeout_seconds = unanswered screen counts as wasting time; meditation_gate = ask once a day whether you've meditated before letting you in.",
   "interrupts": {
     "enabled": true,
     "pause_seconds": 10,
     "grace_minutes": 10,
-    "extension_minutes": 5,
+    "extension_minutes": 10,
     "session_gap_seconds": 60,
     "digest_hour": 8,
-    "redirect_url": "http://127.0.0.1:8765/?bounced=1"
+    "redirect_url": "http://127.0.0.1:8765/?bounced=1",
+    "timeout_seconds": 60,
+    "meditation_gate": true
   },
   "browsers": [
     "Arc",

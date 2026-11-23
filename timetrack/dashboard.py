@@ -70,6 +70,8 @@ class Handler(BaseHTTPRequestHandler):
                         "SELECT ts,category,kind,choice,intention,session_seconds,today_seconds FROM decisions "
                         "WHERE ts>=? AND ts<? ORDER BY ts DESC", (d0, d1))]
                     s["interrupts_enabled"] = bool(rules.interrupts.get("enabled", True))
+                    m = conn.execute("SELECT value FROM meta WHERE key='meditated_date'").fetchone()
+                    s["meditated_today"] = bool(m and m["value"] == d.isoformat()) if d == date.today() else None
                     self._json(s)
                 elif u.path == "/api/week":
                     end = _date(qs, "end")

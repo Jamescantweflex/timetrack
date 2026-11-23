@@ -103,98 +103,102 @@ BG, FG, MUTED, ACCENT, DANGER = "#141414", "#f2f1ed", "#9a9892", "#3987e5", "#e6
 
 
 class PauseWindow:
-    """Full-screen, topmost. Calls on_answer(choice, intention) exactly once."""
+    """Full-screen, topmost. Two questions, two buttons each. Calls on_answer(choice, note) once.
 
-    def __init__(self, root: tk.Tk, prompt: Prompt, pause_seconds: int, grace_min: int, ext_min: int,
-                 opens_today: int, on_answer):
+    Stage 1: productive or wasting time?  Wasting -> stop (redirect). Productive ->
+    Stage 2 (only if not yet meditated today): meditated? No -> stop, go meditate.
+    Yes -> in, re-asked after the allowance. No answer -> treated as wasting time.
+    """
+
+    def __init__(self, root: tk.Tk, prompt: Prompt, pause_seconds: int, allowance_min: int,
+                 opens_today: int, ask_meditation: bool, timeout_seconds: int, on_answer):
         self.on_answer = on_answer
         self.answered = False
         self.p = prompt
         self.remaining = pause_seconds if prompt.kind == "pause" else 3
-        self.grace_min, self.ext_min = grace_min, ext_min
+        self.allowance_min = allowance_min
+        self.ask_meditation = ask_meditation
+        self.timeout_seconds = timeout_seconds
+        self.stage = "main"
+        self.opens_today = opens_today
 
         self.top = tk.Toplevel(root, bg=BG)
         self.top.attributes("-fullscreen", True)
         self.top.attributes("-topmost", True)
         self.top.protocol("WM_DELETE_WINDOW", lambda: None)
-        self.top.bind("<Escape>", lambda e: self._choose(self._secondary_choice()))
-        self.top.bind("<Return>", lambda e: self._primary_if_ready())
 
-        big = tkfont.Font(family="Helvetica Neue", size=44, weight="bold")
-        mid = tkfont.Font(family="Helvetica Neue", size=20)
-        small = tkfont.Font(family="Helvetica Neue", size=15)
-        btn = tkfont.Font(family="Helvetica Neue", size=17, weight="bold")
+        self.big = tkfont.Font(family="Helvetica Neue", size=44, weight="bold")
+        self.mid = tkfont.Font(family="Helvetica Neue", size=20)
+        self.small = tkfont.Font(family="Helvetica Neue", size=15)
+        self.btnf = tkfont.Font(family="Helvetica Neue", size=17, weight="bold")
 
-        f = tk.Frame(self.top, bg=BG)
-        f.place(relx=0.5, rely=0.5, anchor="center")
+        self.frame = None
+        self._build_main()
 
-        cat = prompt.category
-        sess = rollup.fmt_hm(prompt.session_seconds)
-        today = rollup.fmt_hm(prompt.today_seconds)
-        budget = prompt.limit.get("daily_minutes")
-        if prompt.kind == "pause":
+        self.top.lift()
+        self.top.focus_force()
+        self.top.bind_all("<Escape>", lambda e: self._secondary())
+        self.top.bind_all("<Return>", lambda e: self._primary())
+        for delay in (150, 1200):
+            self.top.after(delay, bring_to_front)
+        self._countdown()
+
+    # -- layout -------------------------------------------------------------
+    def _reset_frame(self):
+        if self.frame is not None:
+            self.frame.destroy()
+        self.frame = tk.Frame(self.top, bg=BG)
+        self.frame.place(relx=0.5, rely=0.5, anchor="center")
+        return self.frame
+
+    def _buttons(self, f, secondary_text, primary_text, primary_enabled):
+        row = tk.Frame(f, bg=BG); row.pack()
+        self.btn_secondary = tk.Button(row, text=secondary_text, font=self.btnf, command=self._secondary,
+                                       highlightbackground=BG, padx=22, pady=10, takefocus=1)
+        self.btn_secondary.pack(side="left", padx=12)
+        self.btn_primary = tk.Button(row, text=primary_text, font=self.btnf, command=self._primary,
+                                     highlightbackground=BG, padx=22, pady=10,
+                                     state="normal" if primary_enabled else "disabled")
+        if not self.p.block:
+            self.btn_primary.pack(side="left", padx=12)
+        else:
+            tk.Label(f, text="Budget spent for today. Hard mode is on.", font=self.small, fg=DANGER, bg=BG).pack(pady=(14, 0))
+        tk.Label(f, text=f"Esc = {secondary_text}    Enter = {primary_text}", font=self.small, fg=MUTED, bg=BG).pack(pady=(30, 0))
+        self.btn_secondary.focus_set()
+        self.top.after(300, self.btn_secondary.focus_force)
+
+    def _build_main(self):
+        f = self._reset_frame()
+        p = self.p
+        cat, sess, today = p.category, rollup.fmt_hm(p.session_seconds), rollup.fmt_hm(p.today_seconds)
+        budget = p.limit.get("daily_minutes")
+        if p.kind == "pause":
             head = f"You just opened {cat}."
-            sub = f"Today so far: {today} across {opens_today} open{'s' if opens_today != 1 else ''}."
-        elif prompt.kind == "session":
+            sub = f"Today so far: {today} across {self_opens(self)} open{'s' if self_opens(self) != 1 else ''}."
+        elif p.kind == "session":
             head = f"{sess} on {cat} this sitting."
             sub = f"Today: {today}" + (f" of your {budget}m budget." if budget else ".")
         else:
             head = f"Past today's {cat} budget."
             sub = f"{today} used of {budget}m. This sitting: {sess}."
-
-        tk.Label(f, text=head, font=big, fg=FG, bg=BG, wraplength=900, justify="center").pack(pady=(0, 10))
-        tk.Label(f, text=sub, font=mid, fg=MUTED, bg=BG).pack(pady=(0, 36))
-
-        self.intent = None
-        if prompt.kind == "pause":
-            tk.Label(f, text="What are you here for?", font=small, fg=FG, bg=BG).pack()
-            self.intent = tk.Entry(f, font=mid, width=36, justify="center", relief="flat",
-                                   bg="#232323", fg=FG, insertbackground=FG)
-            self.intent.pack(ipady=8, pady=(8, 30))
-            self.intent.focus_set()
-
-        self.count = tk.Label(f, text="", font=mid, fg=MUTED, bg=BG)
+        tk.Label(f, text=head, font=self.big, fg=FG, bg=BG, wraplength=900, justify="center").pack(pady=(0, 10))
+        tk.Label(f, text=sub, font=self.mid, fg=MUTED, bg=BG).pack(pady=(0, 30))
+        q = "Productive, or wasting time?" if p.kind == "pause" else "Still productive, or wasting time?"
+        tk.Label(f, text=q, font=self.mid, fg=FG, bg=BG).pack(pady=(0, 10))
+        self.count = tk.Label(f, text="", font=self.mid, fg=MUTED, bg=BG)
         self.count.pack(pady=(0, 18))
+        primary = f"Being productive · {self.allowance_min} min" if p.kind == "pause" else f"Still productive · {self.allowance_min} min"
+        self._buttons(f, "Wasting time", primary, primary_enabled=self.remaining <= 0 and not p.block)
 
-        row = tk.Frame(f, bg=BG)
-        row.pack()
-        primary_text = {"pause": f"Go in · {grace_min} min", "session": f"{ext_min} more minutes",
-                        "daily": f"Override · {ext_min} min"}[prompt.kind]
-        secondary_text = {"pause": "Not now", "session": "Done", "daily": "Done"}[prompt.kind]
+    def _build_meditation(self):
+        self.stage = "meditation"
+        f = self._reset_frame()
+        tk.Label(f, text="Have you meditated today?", font=self.big, fg=FG, bg=BG).pack(pady=(0, 10))
+        tk.Label(f, text="If not, that comes first.", font=self.mid, fg=MUTED, bg=BG).pack(pady=(0, 36))
+        self.count = tk.Label(f, text="", font=self.mid, fg=MUTED, bg=BG)
+        self._buttons(f, "No, meditating first", "Yes, carry on", primary_enabled=True)
 
-        self.btn_secondary = tk.Button(row, text=secondary_text, font=btn, command=lambda: self._choose(self._secondary_choice()),
-                                       highlightbackground=BG, padx=22, pady=10)
-        self.btn_secondary.pack(side="left", padx=12)
-        self.btn_primary = tk.Button(row, text=primary_text, font=btn, command=self._primary_if_ready,
-                                     highlightbackground=BG, padx=22, pady=10, state="disabled")
-        if not prompt.block:
-            self.btn_primary.pack(side="left", padx=12)
-        else:
-            tk.Label(f, text="Budget spent for today. Hard mode is on.", font=small, fg=DANGER, bg=BG).pack(pady=(14, 0))
-
-        tk.Label(f, text="Esc = " + secondary_text + "    Enter = " + primary_text, font=small, fg=MUTED, bg=BG).pack(pady=(30, 0))
-
-        self.top.lift()
-        self.top.focus_force()
-        if self.intent is None:
-            # Keys only arrive if some widget holds focus: use the Done button.
-            self.btn_secondary.configure(takefocus=1)
-            self.btn_secondary.focus_set()
-            self.top.after(400, self.btn_secondary.focus_force)
-        self.top.bind_all("<Escape>", lambda e: self._choose(self._secondary_choice()))
-        self.top.bind_all("<Return>", lambda e: self._primary_if_ready())
-        # A Tk window from a background agent doesn't always win focus on its
-        # own. Ask the system to bring Python forward, twice to be safe.
-        for delay in (150, 1200):
-            self.top.after(delay, bring_to_front)
-        self._countdown()
-
-    def _secondary_choice(self) -> str:
-        return "bounce" if self.p.kind == "pause" else "done"
-
-    def _primary_choice(self) -> str:
-        return "go" if self.p.kind == "pause" else "more"
-
+    # -- behaviour ----------------------------------------------------------
     def _countdown(self):
         if self.answered:
             return
@@ -204,28 +208,57 @@ class PauseWindow:
             self.top.after(1000, self._countdown)
         else:
             self.count.config(text="")
-            if not self.p.block:
+            if not self.p.block and self.stage == "main":
                 self.btn_primary.config(state="normal")
+            # No answer for a while = wasting time. The window never just vanishes.
+            self.top.after(self.timeout_seconds * 1000, self._timeout)
 
-    def _primary_if_ready(self):
-        if self.remaining <= 0 and not self.p.block:
-            self._choose(self._primary_choice())
+    def _timeout(self):
+        log.info("ui: timeout fired (stage %s, answered %s)", self.stage, self.answered)
+        if not self.answered:
+            self._finish("timeout", "no answer")
 
-    def _choose(self, choice: str):
+    def _primary(self):
+        log.info("ui: primary (stage %s, remaining %s)", self.stage, self.remaining)
+        if self.answered:
+            return
+        if self.stage == "main":
+            if self.remaining > 0 or self.p.block:
+                return
+            if self.ask_meditation:
+                self._build_meditation()
+            else:
+                self._finish("go" if self.p.kind == "pause" else "more", "productive")
+        else:
+            self._finish("go" if self.p.kind == "pause" else "more", "productive, meditated")
+
+    def _secondary(self):
+        log.info("ui: secondary (stage %s)", self.stage)
+        if self.answered:
+            return
+        if self.stage == "main":
+            self._finish("bounce" if self.p.kind == "pause" else "done", "wasting time")
+        else:
+            self._finish("meditate", "meditate first")
+
+    def _finish(self, choice: str, note: str):
         if self.answered:
             return
         self.answered = True
-        intention = self.intent.get().strip() if self.intent is not None else None
         try:
             self.top.unbind_all("<Escape>")
             self.top.unbind_all("<Return>")
             self.top.destroy()
         except tk.TclError:
             pass
-        self.on_answer(choice, intention or None)
+        self.on_answer(choice, note)
 
     def close(self, choice: str = "left"):
-        self._choose(choice)
+        self._finish(choice, "walked away")
+
+
+def self_opens(w: "PauseWindow") -> int:
+    return getattr(w, "opens_today", 0)
 
 
 # ----------------------------------------------------------------------------
@@ -296,16 +329,22 @@ class Interrupter:
             "INSERT INTO decisions(ts,category,kind,choice,intention,session_seconds,today_seconds) VALUES(?,?,?,?,?,?,?)",
             (int(time.time()), p.category, p.kind, choice, intention, p.session_seconds, p.today_seconds))
 
-    def on_answer(self, p: Prompt, choice: str, intention: str | None):
+    def meditated_today(self) -> bool:
+        r = self.conn.execute("SELECT value FROM meta WHERE key='meditated_date'").fetchone()
+        return bool(r and r["value"] == date.today().isoformat())
+
+    def on_answer(self, p: Prompt, choice: str, note: str | None):
         now = int(time.time())
         self.window = None
         self.engine.answer(now, choice)
-        self.record(p, choice, intention)
-        log.info("%s/%s -> %s %s", p.category, p.kind, choice, f"({intention})" if intention else "")
+        self.record(p, choice, note)
+        log.info("%s/%s -> %s %s", p.category, p.kind, choice, f"({note})" if note else "")
         if choice in ("go", "more") and self.prompt_app:
             # Hand focus back to the browser; a window-less Python app stays "active" otherwise.
             osa(f'tell application "{self.prompt_app}" to activate', timeout=4)
-        if choice in ("bounce", "done") and self.prompt_app:
+        if note and "meditated" in note:
+            self.conn.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('meditated_date',?)", (date.today().isoformat(),))
+        if choice in ("bounce", "done", "timeout", "meditate") and self.prompt_app:
             from .rules import domain_of
             cat = p.category
             rules = self.rules
@@ -318,9 +357,11 @@ class Interrupter:
         self.prompt_app = self.current_app
         log.info("prompt %s/%s (app %s, sitting %ss, today %ss)", p.category, p.kind, self.prompt_app,
                  p.session_seconds, p.today_seconds)
+        gate = bool(self.settings.get("meditation_gate", True)) and not self.meditated_today()
         self.window = PauseWindow(self.root, p, int(self.settings.get("pause_seconds", 10)),
-                                  int(self.settings.get("grace_minutes", 10)), int(self.settings.get("extension_minutes", 5)),
-                                  opens, lambda choice, intention: self.on_answer(p, choice, intention))
+                                  int(self.settings.get("grace_minutes", 10)) if p.kind == "pause" else int(self.settings.get("extension_minutes", 10)),
+                                  opens, gate, int(self.settings.get("timeout_seconds", 60)),
+                                  lambda choice, note: self.on_answer(p, choice, note))
 
     # -- digest -------------------------------------------------------------
     def maybe_digest(self):
@@ -341,9 +382,9 @@ class Interrupter:
             if c["category"] in self.engine.limits and (c["seconds"] or c["opens"]):
                 parts.append(f"{c['category']} {rollup.fmt_hm(c['seconds'])} ({c['opens']} opens)")
         d0, d1 = rollup.day_bounds(y)
-        row = self.conn.execute("SELECT SUM(choice='bounce') b, SUM(choice='go') g FROM decisions WHERE ts>=? AND ts<?", (d0, d1)).fetchone()
+        row = self.conn.execute("SELECT SUM(choice IN ('bounce','done','timeout','meditate')) b, SUM(choice IN ('go','more')) g FROM decisions WHERE ts>=? AND ts<?", (d0, d1)).fetchone()
         if row and (row["b"] or row["g"]):
-            parts.append(f"bounced {row['b'] or 0}, went in {row['g'] or 0}")
+            parts.append(f"stopped {row['b'] or 0}, productive {row['g'] or 0}")
         body = " · ".join(parts) if parts else "nothing tracked"
         notify(f"Yesterday ({y.strftime('%a')})", body)
         self.conn.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('digest_date',?)", (today.isoformat(),))
@@ -371,9 +412,12 @@ class Interrupter:
                 if z and int(z["value"] or 0) > now:
                     enabled = False
             if self.window is not None:
-                self.engine.tick(now, cat, today_seconds)
-                if app and app != "Python":          # something got in front of us: come back
-                    bring_to_front()
+                # While our own window is up the collector sees nothing (or "Python"):
+                # that still counts as being here. Only a real other category means you left.
+                here = self.engine.open_prompt.category if (cat is None or app == "Python") else cat
+                self.engine.tick(now, here, today_seconds)
+                if app and app != "Python" and cat == self.engine.open_prompt.category:
+                    bring_to_front()                 # the feed got back in front of us: come back
                 if self.engine.stale_prompt(now):
                     log.info("prompt abandoned (left %s)", self.engine.open_prompt.category)
                     self.window.close("left")
@@ -398,10 +442,10 @@ def demo(kind: str = "pause") -> None:
     root = tk.Tk(); root.withdraw()
     p = Prompt(kind, "X", 11 * 60 + 20, 27 * 60, {"daily_minutes": 30, "session_minutes": 10}, block=False)
 
-    def done(choice, intention):
-        print("choice:", choice, "intention:", intention)
+    def done(choice, note):
+        print("choice:", choice, "note:", note)
         root.after(200, root.destroy)
-    PauseWindow(root, p, 10, 10, 5, 4, done)
+    PauseWindow(root, p, 10, 10, 4, True, 60, done)
     root.mainloop()
 
 

@@ -43,7 +43,7 @@ button:hover { border-color: var(--text-3); }
 .tile .budget .bar-track { margin-bottom: 4px; }
 .bounced { background: var(--card); border: 1px solid var(--good); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
 .pill { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
-.pill.bounce, .pill.done { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+.pill.bounce, .pill.done, .pill.timeout, .pill.meditate { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
 .pill.go, .pill.more { background: color-mix(in srgb, var(--s2) 18%, transparent); color: var(--s2); }
 .pill.left { background: var(--grid); color: var(--text-3); }
 .grid2 { display: grid; grid-template-columns: 1fr; gap: 16px; }
@@ -101,7 +101,7 @@ td.muted { color: var(--text-3); }
 
 <div class="card">
   <h2>Pause screens</h2>
-  <div class="hint" id="interruptsHint">Every time the pause screen came up this day, and what you chose. Bouncing is the win.</div>
+  <div class="hint" id="interruptsHint">Every time the pause screen came up this day, and what you chose. "Wasting time" is the win.</div>
   <div id="decisions"></div>
 </div>
 
@@ -152,13 +152,15 @@ function renderDecisions(s) {
   const rows = s.decisions || [];
   const hint = document.getElementById('interruptsHint');
   if (s.interrupts_enabled === false) hint.textContent = 'Interrupts are switched off in config/categories.json.';
-  const b = rows.filter(r => r.choice === 'bounce').length, g = rows.filter(r => r.choice === 'go').length,
-        d = rows.filter(r => r.choice === 'done').length, m = rows.filter(r => r.choice === 'more').length;
-  if (!rows.length) { document.getElementById('decisions').innerHTML = '<div class="empty">No pause screens this day.</div>'; return; }
-  let h = `<div class="sub" style="color:var(--text-2);margin-bottom:8px">${rows.length} prompts · bounced ${b} · went in ${g} · stopped at limit ${d} · took more time ${m}</div>`;
-  h += '<table><thead><tr><th>When</th><th>What</th><th>Why it came up</th><th>You chose</th><th>Intention you typed</th><th class="num">Sitting</th><th class="num">Day total</th></tr></thead><tbody>';
+  const stopped = rows.filter(r => ['bounce','done','timeout','meditate'].includes(r.choice)).length,
+        prod = rows.filter(r => ['go','more'].includes(r.choice)).length,
+        med = rows.filter(r => r.choice === 'meditate').length, to = rows.filter(r => r.choice === 'timeout').length;
+  const medLine = s.meditated_today === true ? 'Meditated today: yes.' : (s.meditated_today === false ? 'Meditated today: not yet.' : '');
+  if (!rows.length) { document.getElementById('decisions').innerHTML = `<div class="empty">No pause screens this day. ${medLine}</div>`; return; }
+  let h = `<div class="sub" style="color:var(--text-2);margin-bottom:8px">${rows.length} prompts · stopped ${stopped} (${to} by no answer, ${med} to meditate) · productive ${prod} · ${medLine}</div>`;
+  h += '<table><thead><tr><th>When</th><th>What</th><th>Why it came up</th><th>You chose</th><th>Note</th><th class="num">Sitting</th><th class="num">Day total</th></tr></thead><tbody>';
   const kindText = {pause: 'opened it', session: 'sitting limit', daily: 'daily budget'};
-  const choiceText = {bounce: 'Not now', go: 'Went in', more: 'More time', done: 'Done', left: 'Walked away'};
+  const choiceText = {bounce: 'Wasting time', go: 'Productive', more: 'Still productive', done: 'Wasting time', timeout: 'No answer', meditate: 'Meditate first', left: 'Walked away'};
   for (const r of rows) {
     h += `<tr><td class="muted">${hm(r.ts)}</td><td><span class="sw" style="background:${colorOf(r.category, s.order)}"></span>${esc(r.category)}</td>
       <td class="muted">${kindText[r.kind]||r.kind}</td><td><span class="pill ${r.choice}">${choiceText[r.choice]||r.choice}</span></td>

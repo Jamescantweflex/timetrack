@@ -80,6 +80,27 @@ def test_cooldown_prevents_double_prompt():
     assert e.tick(t + 25, "X", 25).kind == "pause"
 
 
+def test_timeout_and_meditate_are_stops():
+    e, t = mk(), 100
+    assert e.tick(t, "X", 0).kind == "pause"
+    e.answer(t + 70, "timeout")
+    assert e.tick(t + 100, "X", 100).kind == "pause"      # back on X after a stop: asked again
+    e.answer(t + 101, "meditate")
+    assert e.tick(t + 130, "X", 130).kind == "pause"
+
+
+def test_productive_reasks_every_allowance():
+    e, t = mk(), 100
+    e.tick(t, "X", 0); e.answer(t + 12, "go")             # 10 min allowance
+    for dt in range(13, 612, 3):
+        assert e.tick(t + dt, "X", dt) is None
+    p = e.tick(t + 615, "X", 615); assert p and p.kind == "session"
+    e.answer(t + 616, "more")                             # 5 min in the test settings
+    for dt in range(617, 916, 3):
+        assert e.tick(t + dt, "X", dt) is None
+    assert e.tick(t + 920, "X", 920).kind == "session"
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
