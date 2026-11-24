@@ -61,6 +61,11 @@ bars, the last 7 days, time by hour of day, every pause screen and what you
 chose, and the full list of where the day went. The **Watch list and
 settings** panel at the bottom is where you make it yours.
 
+**What leads you there.** For every sitting on a watched site, TimeTrack
+notes what was in front in the minute before. After a couple of weeks the
+dashboard card of that name shows the pattern, for example "40% of X opens
+come straight from Slack". That is usually the moment to fix.
+
 **The menu-bar icon.** A small hourglass at the top right of the screen shows
 today's time on your watched sites. Click it for the breakdown per site
 against its budget, your Instead action, a shortcut to the dashboard, and
@@ -241,7 +246,8 @@ you want the pause screen on.
 ## iPhone (optional)
 
 Apple doesn't let apps read Screen Time, so the phone side is a Shortcuts
-automation that logs when you open chosen apps. See
+automation that asks the same "Productive, or wasting time?" question when you
+open chosen apps and logs the time to your Mac's dashboard. See
 [docs/iphone-shortcuts.md](docs/iphone-shortcuts.md).
 
 ---
@@ -262,5 +268,6 @@ python3 tests/test_engine.py
 python3 tests/test_collector.py
 python3 tests/test_dashboard.py
 python3 tests/test_menubar.py
+python3 tests/test_rollup.py
 python3 -m timetrack demo --kind pause   # the screen with fake numbers
 ```

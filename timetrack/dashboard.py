@@ -169,6 +169,9 @@ class Handler(BaseHTTPRequestHandler):
                     s["instead_done_today"] = done if d == date.today() else None
                     s["setup_done"] = meta.get("setup_done") == "1"
                     self._json(s)
+                elif u.path == "/api/triggers":
+                    days = max(1, min(90, int(qs.get("days", ["14"])[0])))
+                    self._json(rollup.triggers(conn, rules, days))
                 elif u.path == "/api/menubar":
                     meta = {r["key"]: r["value"] for r in conn.execute("SELECT key,value FROM meta")}
                     lim = {c: rules.limits(c) for c in rules.tracked_names() if rules.limits(c)}

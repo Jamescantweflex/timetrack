@@ -119,6 +119,12 @@ button.danger { color: var(--bad); }
 <div id="bounced" class="bounced" style="display:none"></div>
 
 <div class="card">
+  <h2>What leads you there</h2>
+  <div class="hint">What was in front in the minute before each sitting on a watched site, last 14 days. The top line is usually the moment to fix.</div>
+  <div id="triggers"></div>
+</div>
+
+<div class="card">
   <h2>Pause screens</h2>
   <div class="hint" id="interruptsHint">Every time the pause screen came up this day, and what you chose. "Wasting time" is the win.</div>
   <div id="decisions"></div>
@@ -180,6 +186,24 @@ async function load() {
   setupBanner(dayData.setup_done);
 }
 
+async function loadTriggers() {
+  const t = await fetch('/api/triggers?days=14').then(r => r.json());
+  const el = document.getElementById('triggers'), cats = Object.entries(t.categories || {});
+  if (!cats.some(([, c]) => c.total)) { el.innerHTML = '<div class="sub" style="color:var(--text-3)">Nothing yet. This fills in as you use the Mac.</div>'; return; }
+  let h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px">';
+  cats.forEach(([name, c], i) => {
+    if (!c.total) return;
+    h += `<div><div style="font-weight:600;margin-bottom:8px">${esc(name)} <span style="color:var(--text-3);font-weight:400">· ${c.total} sitting${c.total === 1 ? '' : 's'}</span></div>`;
+    c.from.slice(0, 6).forEach(f => {
+      h += `<div style="display:grid;grid-template-columns:150px 1fr 64px;gap:10px;align-items:center;font-size:13px;margin-bottom:6px">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(f.name)}">${esc(f.name)}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${f.pct}%;background:var(--s${(i % 8) + 1})"></div></div>
+        <span class="num" style="color:var(--text-2)">${f.pct}% · ${f.count}</span></div>`;
+    });
+    h += '</div>';
+  });
+  el.innerHTML = h + '</div>';
+}
 function renderDecisions(s) {
   const rows = s.decisions || [];
   const hint = document.getElementById('interruptsHint');
@@ -414,7 +438,7 @@ async function watchQuick(label, isDomain) {
                                limits: { pause_on_open: true, session_minutes: 10, daily_minutes: 30, block_after_daily: false } };
   if (await saveConfig(payload)) document.getElementById('settingsCard').scrollIntoView({behavior: 'smooth', block: 'start'});
 }
-loadConfig().then(() => { bouncedBanner(); load(); });
+loadConfig().then(() => { bouncedBanner(); load(); loadTriggers(); });
 
 document.getElementById('prev').onclick = () => { day.setDate(day.getDate()-1); load(); };
 document.getElementById('next').onclick = () => { day.setDate(day.getDate()+1); load(); };

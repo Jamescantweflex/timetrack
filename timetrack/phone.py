@@ -3,6 +3,8 @@
 File: iCloud Drive/Shortcuts/TimeTrack/phone_events.jsonl, one JSON object per line:
     {"ts": "2026-11-19T07:40:12+10:00", "app": "YouTube", "event": "open"}
     {"ts": "2026-11-19T07:52:03+10:00", "app": "YouTube", "event": "close"}
+or the one-field form the documented shortcut writes:
+    {"ts": "2026-11-19T07:40:12+10:00", "e": "YouTube open"}
 
 Open/close pairs become spans. An open with no close is capped.
 Ingest is idempotent: every raw line is remembered in phone_raw.
@@ -41,8 +43,12 @@ def parse_line(line: str) -> dict | None:
     try:
         obj = json.loads(line)
         ts = parse_ts(str(obj["ts"]))
-        app = str(obj["app"]).strip()
-        event = str(obj["event"]).strip().lower().split(" ")[0]   # "open my reason" -> "open"
+        if "e" in obj:                       # simple form: {"ts": ..., "e": "YouTube open"}
+            app, _, event = str(obj["e"]).strip().rpartition(" ")
+            app, event = app.strip(), event.lower()
+        else:
+            app = str(obj["app"]).strip()
+            event = str(obj["event"]).strip().lower().split(" ")[0]   # "open my reason" -> "open"
     except (ValueError, KeyError, TypeError) as e:
         log.warning("bad phone line %r: %s", line[:120], e)
         return None

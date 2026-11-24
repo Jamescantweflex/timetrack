@@ -117,3 +117,39 @@ def fmt_hm(seconds: int) -> str:
     m = int(round(seconds / 60))
     h, m = divmod(m, 60)
     return f"{h}h {m:02d}m" if h else f"{m}m"
+
+
+def triggers(conn, rules: Rules, days: int = 14, today: date | None = None, lookback: int = 60) -> dict:
+    """What was in front in the minute before each sitting on a watched category.
+
+    For every Mac session on a category that has limits, find the last span of
+    a different category that ended within `lookback` seconds of the session
+    start. No such span means the Mac was idle, asleep or locked just before:
+    "Came back to the Mac".
+    """
+    today = today or date.today()
+    start, _ = day_bounds(today - timedelta(days=days - 1))
+    _, end = day_bounds(today)
+    spans = [s for s in load_spans(conn, start, end, rules)
+             if s["source"] == "mac" and s["app"] not in rules.ignore_apps]
+    spans.sort(key=lambda s: s["start"])
+    own = {"127.0.0.1", "localhost"}       # our own dashboard: where a "wasting time" answer sends the tab
+    watched = [n for n in rules.tracked_names() if rules.limits(n)]
+    out: dict[str, dict] = {}
+    for cat in watched:
+        counts: dict[str, int] = defaultdict(int)
+        for x in sessions([s for s in spans if s["category"] == cat]):
+            prev = None
+            for s in spans:
+                if s["end"] > x["start"]:
+                    break
+                if s["category"] != cat and x["start"] - s["end"] <= lookback and s["seconds"] >= 2:
+                    prev = s
+            name = "Came back to the Mac" if prev is None else (
+                "Straight back after stopping" if prev["category"] in own else prev["category"])
+            counts[name] += 1
+        total = sum(counts.values())
+        rows = sorted(counts.items(), key=lambda kv: -kv[1])
+        out[cat] = {"total": total,
+                    "from": [{"name": k, "count": v, "pct": round(100 * v / total)} for k, v in rows]}
+    return {"days": days, "categories": out}
