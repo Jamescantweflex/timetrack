@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TimeTrack</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.png" type="image/png">
+<link rel="apple-touch-icon" href="/icon.png">
+<meta name="theme-color" content="#2a78d6">
+<meta name="apple-mobile-web-app-title" content="TimeTrack">
 <style>
 :root {
   color-scheme: light;
@@ -43,7 +48,7 @@ button:hover { border-color: var(--text-3); }
 .tile .budget .bar-track { margin-bottom: 4px; }
 .bounced { background: var(--card); border: 1px solid var(--good); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
 .pill { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
-.pill.bounce, .pill.done, .pill.timeout, .pill.meditate { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+.pill.bounce, .pill.done, .pill.timeout, .pill.meditate, .pill.instead { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
 .pill.go, .pill.more { background: color-mix(in srgb, var(--s2) 18%, transparent); color: var(--s2); }
 .pill.left { background: var(--grid); color: var(--text-3); }
 .grid2 { display: grid; grid-template-columns: 1fr; gap: 16px; }
@@ -66,7 +71,7 @@ td.muted { color: var(--text-3); }
 .settings input[type=number] { width: 64px; text-align: right; }
 .settings td, .settings th { vertical-align: middle; padding: 5px 6px; }
 #catTable { overflow-x: auto; }
-#catTable table { min-width: 860px; }
+#catTable table { min-width: 1000px; }
 .settings .globals { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; margin: 6px 0 14px; font-size: 13px; }
 .settings .globals label { display: flex; align-items: center; gap: 6px; color: var(--text-2); }
 .settings .actions { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
@@ -110,6 +115,7 @@ button.danger { color: var(--bad); }
   </div>
 </div>
 
+<div id="setup" class="bounced" style="display:none"></div>
 <div id="bounced" class="bounced" style="display:none"></div>
 
 <div class="card">
@@ -171,21 +177,23 @@ async function load() {
     fetch(`/api/status`).then(r=>r.json()),
   ]);
   renderStatus(st); renderTiles(dayData); renderWeek(weekData); renderHours(dayData); renderAll(dayData); renderSessions(dayData); renderDecisions(dayData);
+  setupBanner(dayData.setup_done);
 }
 
 function renderDecisions(s) {
   const rows = s.decisions || [];
   const hint = document.getElementById('interruptsHint');
   if (s.interrupts_enabled === false) hint.textContent = 'Interrupts are switched off in config/categories.json.';
-  const stopped = rows.filter(r => ['bounce','done','timeout','meditate'].includes(r.choice)).length,
+  const stopped = rows.filter(r => ['bounce','done','timeout','meditate','instead'].includes(r.choice)).length,
         prod = rows.filter(r => ['go','more'].includes(r.choice)).length,
-        med = rows.filter(r => r.choice === 'meditate').length, to = rows.filter(r => r.choice === 'timeout').length;
-  const medLine = s.meditated_today === true ? 'Meditated today: yes.' : (s.meditated_today === false ? 'Meditated today: not yet.' : '');
+        med = rows.filter(r => r.choice === 'instead' || r.choice === 'meditate').length, to = rows.filter(r => r.choice === 'timeout').length;
+  const ins = (CFG.interrupts || {}).instead;
+  const medLine = !ins ? '' : (s.instead_done_today === true ? `${esc(ins)}: done today.` : (s.instead_done_today === false ? `${esc(ins)}: not yet today.` : ''));
   if (!rows.length) { document.getElementById('decisions').innerHTML = `<div class="empty">No pause screens this day. ${medLine}</div>`; return; }
-  let h = `<div class="sub" style="color:var(--text-2);margin-bottom:8px">${rows.length} prompts · stopped ${stopped} (${to} by no answer, ${med} to meditate) · productive ${prod} · ${medLine}</div>`;
+  let h = `<div class="sub" style="color:var(--text-2);margin-bottom:8px">${rows.length} prompts · stopped ${stopped} (${to} by no answer, ${med} to do the instead thing) · productive ${prod} · ${medLine}</div>`;
   h += '<table><thead><tr><th>When</th><th>What</th><th>Why it came up</th><th>You chose</th><th>Note</th><th class="num">Sitting</th><th class="num">Day total</th></tr></thead><tbody>';
   const kindText = {pause: 'opened it', session: 'sitting limit', daily: 'daily budget'};
-  const choiceText = {bounce: 'Wasting time', go: 'Productive', more: 'Still productive', done: 'Wasting time', timeout: 'No answer', meditate: 'Meditate first', left: 'Walked away'};
+  const choiceText = {bounce: 'Wasting time', go: 'Productive', more: 'Still productive', done: 'Wasting time', timeout: 'No answer', instead: 'Instead first', meditate: 'Instead first', left: 'Walked away'};
   for (const r of rows) {
     h += `<tr><td class="muted">${hm(r.ts)}</td><td><span class="sw" style="background:${colorOf(r.category, s.order)}"></span>${esc(r.category)}</td>
       <td class="muted">${kindText[r.kind]||r.kind}</td><td><span class="pill ${r.choice}">${choiceText[r.choice]||r.choice}</span></td>
@@ -194,14 +202,26 @@ function renderDecisions(s) {
   document.getElementById('decisions').innerHTML = h + '</tbody></table>';
 }
 
-(function bouncedBanner() {
-  const q = new URLSearchParams(location.search);
-  if (!q.get('bounced')) return;
-  const el = document.getElementById('bounced');
+const BOUNCE = new URLSearchParams(location.search);
+history.replaceState({}, '', '/');
+function insteadFor(cat) {
+  const c = (CFG.categories || {})[cat] || {};
+  return (c.instead || (CFG.interrupts || {}).instead || '').trim();
+}
+function bouncedBanner() {
+  if (!BOUNCE.get('bounced')) return;
+  const el = document.getElementById('bounced'), cat = BOUNCE.get('cat') || '', ins = insteadFor(cat);
   el.style.display = 'block';
-  el.innerHTML = '<strong>Good call.</strong> You chose not now. Here is where the day stands.';
-  history.replaceState({}, '', '/');
-})();
+  el.innerHTML = `<strong>Good call.</strong> You stopped${cat ? ' ' + esc(cat) : ''}.` +
+    (ins ? ` Instead: <strong>${esc(ins)}</strong>.` : ' Here is where the day stands.');
+}
+function setupBanner(done) {
+  const el = document.getElementById('setup');
+  if (done) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = `<strong>Make it yours.</strong> These are the defaults it came with. Choose the sites and apps you drift onto,
+    and what you'd rather be doing instead, then Save. <a href="#settingsCard">Open settings</a>`;
+}
 
 function renderStatus(st) {
   const el = document.getElementById('status');
@@ -324,9 +344,10 @@ function renderSettings() {
     <label>"Productive" buys <input type="number" id="g_grace" value="${it.grace_minutes ?? 10}" min="1"> min</label>
     <label>then re-asks every <input type="number" id="g_ext" value="${it.extension_minutes ?? 10}" min="1"> min</label>
     <label>No answer after <input type="number" id="g_timeout" value="${it.timeout_seconds ?? 60}" min="10"> s = wasting time</label>
-    <label><input type="checkbox" id="g_med" ${it.meditation_gate !== false ? 'checked' : ''}> Ask "meditated today?" once a day</label>`;
+    <label style="flex-basis:100%">Instead of drifting, I should: <input type="text" id="g_instead" value="${esc(it.instead || '')}" placeholder="e.g. Meditate, Call a client, Go for a walk" style="min-width:280px"></label>
+    <label><input type="checkbox" id="g_gate" ${it.instead_gate !== false ? 'checked' : ''}> Before allowing "productive", ask once a day whether that's done</label>`;
   const names = Object.keys(CFG.categories || {});
-  let h = '<table><thead><tr><th>Name</th><th>Websites (comma separated)</th><th>Mac apps</th><th>iPhone apps</th><th title="Counts time with no keyboard or mouse, for video">Video</th><th title="Show the productive-or-wasting screen when a session starts">Pause screen</th><th class="num">Per sitting (min)</th><th class="num">Per day (min)</th><th title="Once over the daily budget, no override">Hard</th><th></th></tr></thead><tbody>';
+  let h = '<table><thead><tr><th>Name</th><th>Websites (comma separated)</th><th>Mac apps</th><th>iPhone apps</th><th title="Counts time with no keyboard or mouse, for video">Video</th><th title="Show the productive-or-wasting screen when a session starts">Pause screen</th><th class="num">Per sitting (min)</th><th class="num">Per day (min)</th><th title="Once over the daily budget, no override">Hard</th><th title="Overrides the general instead action for this one">Instead (optional)</th><th></th></tr></thead><tbody>';
   names.forEach((n, i) => {
     const c = CFG.categories[n], l = c.limits || null;
     h += `<tr data-i="${i}">
@@ -339,6 +360,7 @@ function renderSettings() {
       <td class="num"><input type="number" class="c_sess" value="${l ? l.session_minutes : ''}" min="0" placeholder="–"></td>
       <td class="num"><input type="number" class="c_day" value="${l ? l.daily_minutes : ''}" min="0" placeholder="–"></td>
       <td><input type="checkbox" class="c_hard" ${l && l.block_after_daily ? 'checked' : ''}></td>
+      <td><input type="text" class="c_instead" value="${esc(c.instead || '')}" style="min-width:120px"></td>
       <td><button class="small danger c_del" title="Remove">✕</button></td></tr>`;
   });
   document.getElementById('catTable').innerHTML = h + '</tbody></table>';
@@ -350,14 +372,15 @@ function readSettingsForm() {
     const g = cls => tr.querySelector('.' + cls);
     const name = g('c_name').value.trim(); if (!name) return;
     const sess = g('c_sess').value, day = g('c_day').value, pause = g('c_pause').checked, hard = g('c_hard').checked;
-    const c = { domains: g('c_domains').value, apps: g('c_apps').value, phone_apps: g('c_phone').value, passive: g('c_passive').checked };
+    const c = { domains: g('c_domains').value, apps: g('c_apps').value, phone_apps: g('c_phone').value, passive: g('c_passive').checked, instead: g('c_instead').value };
     if (pause || sess || day || hard) c.limits = { pause_on_open: pause, session_minutes: +sess || 0, daily_minutes: +day || 0, block_after_daily: hard };
     cats[name] = c;
   });
   return { interrupts: {
       enabled: document.getElementById('g_enabled').checked, pause_seconds: +document.getElementById('g_pause').value,
       grace_minutes: +document.getElementById('g_grace').value, extension_minutes: +document.getElementById('g_ext').value,
-      timeout_seconds: +document.getElementById('g_timeout').value, meditation_gate: document.getElementById('g_med').checked },
+      timeout_seconds: +document.getElementById('g_timeout').value, instead: document.getElementById('g_instead').value,
+      instead_gate: document.getElementById('g_gate').checked },
     categories: cats };
 }
 async function saveConfig(payload) {
@@ -390,12 +413,11 @@ async function watchQuick(label, isDomain) {
                                limits: { pause_on_open: true, session_minutes: 10, daily_minutes: 30, block_after_daily: false } };
   if (await saveConfig(payload)) document.getElementById('settingsCard').scrollIntoView({behavior: 'smooth', block: 'start'});
 }
-loadConfig();
+loadConfig().then(() => { bouncedBanner(); load(); });
 
 document.getElementById('prev').onclick = () => { day.setDate(day.getDate()-1); load(); };
 document.getElementById('next').onclick = () => { day.setDate(day.getDate()+1); load(); };
 document.getElementById('today').onclick = () => { day = new Date(); day.setHours(0,0,0,0); load(); };
-load();
 setInterval(() => { if (day.toDateString() === new Date().toDateString()) load(); }, 30000);
 </script>
 </body>

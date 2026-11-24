@@ -60,8 +60,9 @@ def osa(script: str, timeout: float = 8) -> bool:
 
 
 def notify(title: str, body: str) -> None:
-    body = body.replace('"', "'")
-    osa(f'display notification "{body}" with title "{title}"')
+    # Config strings end up inside an AppleScript literal: neutralise quotes and backslashes.
+    clean = lambda t: str(t).replace("\\", "/").replace('"', "'")
+    osa(f'display notification "{clean(body)}" with title "{clean(title)}"')
 
 
 def bring_to_front() -> None:
@@ -106,18 +107,19 @@ class PauseWindow:
     """Full-screen, topmost. Two questions, two buttons each. Calls on_answer(choice, note) once.
 
     Stage 1: productive or wasting time?  Wasting -> stop (redirect). Productive ->
-    Stage 2 (only if not yet meditated today): meditated? No -> stop, go meditate.
-    Yes -> in, re-asked after the allowance. No answer -> treated as wasting time.
+    Stage 2 (only if the person's "instead" action isn't done today): done it? No -> stop,
+    go do that. Yes -> in, re-asked after the allowance. No answer -> treated as wasting time.
     """
 
     def __init__(self, root: tk.Tk, prompt: Prompt, pause_seconds: int, allowance_min: int,
-                 opens_today: int, ask_meditation: bool, timeout_seconds: int, on_answer):
+                 opens_today: int, instead: str, ask_gate: bool, timeout_seconds: int, on_answer):
         self.on_answer = on_answer
         self.answered = False
         self.p = prompt
         self.remaining = pause_seconds if prompt.kind == "pause" else 3
         self.allowance_min = allowance_min
-        self.ask_meditation = ask_meditation
+        self.instead = instead            # "Go for a walk", "Meditate", ... may be ""
+        self.ask_gate = ask_gate and bool(instead)
         self.timeout_seconds = timeout_seconds
         self.stage = "main"
         self.opens_today = opens_today
@@ -182,7 +184,9 @@ class PauseWindow:
             head = f"Past today's {cat} budget."
             sub = f"{today} used of {budget}m. This sitting: {sess}."
         tk.Label(f, text=head, font=self.big, fg=FG, bg=BG, wraplength=900, justify="center").pack(pady=(0, 10))
-        tk.Label(f, text=sub, font=self.mid, fg=MUTED, bg=BG).pack(pady=(0, 30))
+        tk.Label(f, text=sub, font=self.mid, fg=MUTED, bg=BG).pack(pady=(0, 8 if self.instead else 30))
+        if self.instead:
+            tk.Label(f, text=f"Instead: {self.instead}", font=self.mid, fg=ACCENT, bg=BG, wraplength=900).pack(pady=(0, 30))
         q = "Productive, or wasting time?" if p.kind == "pause" else "Still productive, or wasting time?"
         tk.Label(f, text=q, font=self.mid, fg=FG, bg=BG).pack(pady=(0, 10))
         self.count = tk.Label(f, text="", font=self.mid, fg=MUTED, bg=BG)
@@ -190,13 +194,14 @@ class PauseWindow:
         primary = f"Being productive · {self.allowance_min} min" if p.kind == "pause" else f"Still productive · {self.allowance_min} min"
         self._buttons(f, "Wasting time", primary, primary_enabled=self.remaining <= 0 and not p.block)
 
-    def _build_meditation(self):
-        self.stage = "meditation"
+    def _build_gate(self):
+        self.stage = "gate"
         f = self._reset_frame()
-        tk.Label(f, text="Have you meditated today?", font=self.big, fg=FG, bg=BG).pack(pady=(0, 10))
+        tk.Label(f, text="Have you done this today?", font=self.big, fg=FG, bg=BG).pack(pady=(0, 10))
+        tk.Label(f, text=self.instead, font=self.big, fg=ACCENT, bg=BG, wraplength=900, justify="center").pack(pady=(0, 10))
         tk.Label(f, text="If not, that comes first.", font=self.mid, fg=MUTED, bg=BG).pack(pady=(0, 36))
         self.count = tk.Label(f, text="", font=self.mid, fg=MUTED, bg=BG)
-        self._buttons(f, "No, meditating first", "Yes, carry on", primary_enabled=True)
+        self._buttons(f, "No, doing that first", "Yes, carry on", primary_enabled=True)
 
     # -- behaviour ----------------------------------------------------------
     def _countdown(self):
@@ -225,12 +230,12 @@ class PauseWindow:
         if self.stage == "main":
             if self.remaining > 0 or self.p.block:
                 return
-            if self.ask_meditation:
-                self._build_meditation()
+            if self.ask_gate:
+                self._build_gate()
             else:
                 self._finish("go" if self.p.kind == "pause" else "more", "productive")
         else:
-            self._finish("go" if self.p.kind == "pause" else "more", "productive, meditated")
+            self._finish("go" if self.p.kind == "pause" else "more", "productive, instead done")
 
     def _secondary(self):
         log.info("ui: secondary (stage %s)", self.stage)
@@ -239,7 +244,7 @@ class PauseWindow:
         if self.stage == "main":
             self._finish("bounce" if self.p.kind == "pause" else "done", "wasting time")
         else:
-            self._finish("meditate", "meditate first")
+            self._finish("instead", f"{self.instead} first")
 
     def _finish(self, choice: str, note: str):
         if self.answered:
@@ -329,9 +334,17 @@ class Interrupter:
             "INSERT INTO decisions(ts,category,kind,choice,intention,session_seconds,today_seconds) VALUES(?,?,?,?,?,?,?)",
             (int(time.time()), p.category, p.kind, choice, intention, p.session_seconds, p.today_seconds))
 
-    def meditated_today(self) -> bool:
-        r = self.conn.execute("SELECT value FROM meta WHERE key='meditated_date'").fetchone()
-        return bool(r and r["value"] == date.today().isoformat())
+    def instead_done_today(self) -> bool:
+        today = date.today().isoformat()
+        for key in ("instead_done_date", "meditated_date"):      # second: pre-24-Nov name
+            r = self.conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+            if r and r["value"] == today:
+                return True
+        return False
+
+    def instead_for(self, category: str) -> str:
+        spec = self.rules.categories.get(category, {}) if hasattr(self.rules, "categories") else {}
+        return str(spec.get("instead") or self.settings.get("instead") or "").strip()
 
     def on_answer(self, p: Prompt, choice: str, note: str | None):
         now = int(time.time())
@@ -342,13 +355,16 @@ class Interrupter:
         if choice in ("go", "more") and self.prompt_app:
             # Hand focus back to the browser; a window-less Python app stays "active" otherwise.
             osa(f'tell application "{self.prompt_app}" to activate', timeout=4)
-        if note and "meditated" in note:
-            self.conn.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('meditated_date',?)", (date.today().isoformat(),))
-        if choice in ("bounce", "done", "timeout", "meditate") and self.prompt_app:
+        if note and "instead done" in note:
+            self.conn.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('instead_done_date',?)", (date.today().isoformat(),))
+        if choice in ("bounce", "done", "timeout", "instead") and self.prompt_app:
             from .rules import domain_of
             cat = p.category
             rules = self.rules
-            redirect_tab(self.prompt_app, self.settings.get("redirect_url", "http://127.0.0.1:8765/"),
+            from urllib.parse import quote
+            url = self.settings.get("redirect_url", "http://127.0.0.1:8765/?bounced=1")
+            url += ("&" if "?" in url else "?") + "cat=" + quote(cat)
+            redirect_tab(self.prompt_app, url,
                          lambda u: rules.categorise("mac", self.prompt_app, domain_of(u)) == cat)
             osa(f'tell application "{self.prompt_app}" to activate', timeout=4)
 
@@ -357,10 +373,11 @@ class Interrupter:
         self.prompt_app = self.current_app
         log.info("prompt %s/%s (app %s, sitting %ss, today %ss)", p.category, p.kind, self.prompt_app,
                  p.session_seconds, p.today_seconds)
-        gate = bool(self.settings.get("meditation_gate", True)) and not self.meditated_today()
+        gate_on = bool(self.settings.get("instead_gate", self.settings.get("meditation_gate", True)))
+        gate = gate_on and not self.instead_done_today()
         self.window = PauseWindow(self.root, p, int(self.settings.get("pause_seconds", 10)),
                                   int(self.settings.get("grace_minutes", 10)) if p.kind == "pause" else int(self.settings.get("extension_minutes", 10)),
-                                  opens, gate, int(self.settings.get("timeout_seconds", 60)),
+                                  opens, self.instead_for(p.category), gate, int(self.settings.get("timeout_seconds", 60)),
                                   lambda choice, note: self.on_answer(p, choice, note))
 
     # -- digest -------------------------------------------------------------
@@ -382,7 +399,7 @@ class Interrupter:
             if c["category"] in self.engine.limits and (c["seconds"] or c["opens"]):
                 parts.append(f"{c['category']} {rollup.fmt_hm(c['seconds'])} ({c['opens']} opens)")
         d0, d1 = rollup.day_bounds(y)
-        row = self.conn.execute("SELECT SUM(choice IN ('bounce','done','timeout','meditate')) b, SUM(choice IN ('go','more')) g FROM decisions WHERE ts>=? AND ts<?", (d0, d1)).fetchone()
+        row = self.conn.execute("SELECT SUM(choice IN ('bounce','done','timeout','instead','meditate')) b, SUM(choice IN ('go','more')) g FROM decisions WHERE ts>=? AND ts<?", (d0, d1)).fetchone()
         if row and (row["b"] or row["g"]):
             parts.append(f"stopped {row['b'] or 0}, productive {row['g'] or 0}")
         body = " · ".join(parts) if parts else "nothing tracked"
@@ -445,7 +462,7 @@ def demo(kind: str = "pause") -> None:
     def done(choice, note):
         print("choice:", choice, "note:", note)
         root.after(200, root.destroy)
-    PauseWindow(root, p, 10, 10, 4, True, 60, done)
+    PauseWindow(root, p, 10, 10, 4, "Meditate", True, 60, done)
     root.mainloop()
 
 

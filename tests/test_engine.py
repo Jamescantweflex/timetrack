@@ -85,7 +85,7 @@ def test_timeout_and_meditate_are_stops():
     assert e.tick(t, "X", 0).kind == "pause"
     e.answer(t + 70, "timeout")
     assert e.tick(t + 100, "X", 100).kind == "pause"      # back on X after a stop: asked again
-    e.answer(t + 101, "meditate")
+    e.answer(t + 101, "instead")
     assert e.tick(t + 130, "X", 130).kind == "pause"
 
 

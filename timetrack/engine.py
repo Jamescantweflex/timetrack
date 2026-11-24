@@ -108,7 +108,7 @@ class Engine:
         return now - self._st(self.open_prompt.category).last_seen > self.gap
 
     def answer(self, now: int, choice: str) -> None:
-        """choice: go | more | bounce | done | timeout | meditate | left"""
+        """choice: go | more | bounce | done | timeout | instead | left  (meditate = old name for instead)"""
         p = self.open_prompt
         if p is None:
             return
@@ -121,5 +121,5 @@ class Engine:
             st.allowed_until = now + self.extension
         else:  # bounce / done / left: next sighting after the gap is a new session
             st.allowed_until = None
-            if choice in ("bounce", "done", "timeout", "meditate"):
+            if choice in ("bounce", "done", "timeout", "instead", "meditate"):
                 st.last_seen = 0

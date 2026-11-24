@@ -1,10 +1,10 @@
 # TimeTrack — design (short)
 
-Date: 2026-11-19. Owner: James Cant. Status: approved in conversation ("sounds good. lets build").
+Date: 2026-11-19. Status: approved.
 
 ## Intent
 
-James loses time to X and YouTube without noticing he has started. The tool
+The user loses time to X and YouTube without noticing he has started. The tool
 makes the unconscious visible first, then interrupts it. It is one part of a
 broader effort to break the habit, not the whole fix.
 
@@ -19,9 +19,9 @@ broader effort to break the habit, not the whole fix.
 
 ## Non-goals
 
-- Cloud sync, accounts, sharing. Everything is local to James's Mac plus a
+- Cloud sync, accounts, sharing. Everything is local to the user's Mac plus a
   file in his own iCloud Drive.
-- Capturing iPhone usage for apps James hasn't opted in. iOS does not allow it
+- Capturing iPhone usage for apps the user hasn't opted in. iOS does not allow it
   (Apple's DeviceActivity framework keeps Screen Time data inside a sandboxed
   report extension; it cannot be exported. Apple-documented, verify against
   current docs before relying on it).
@@ -68,7 +68,7 @@ broader effort to break the habit, not the whole fix.
 
 ## Phase 2, built the same day
 
-James left for a few days with "make your own decisions, give me something to
+the user left for a few days with "make your own decisions, give me something to
 test". So the baseline-week-first plan was collapsed: interrupts are built and
 switched on with default thresholds, to be tuned against the data.
 
@@ -91,20 +91,20 @@ switched on with default thresholds, to be tuned against the data.
 Defaults are my calls (Assumption): 10 s pause, 10 min grace, 5 min extension,
 X 10/30, YouTube 20/45. Revisit after a week of data.
 
-## Changes after James's first test (24 Nov 2026)
+## Changes after the user's first test (24 Nov 2026)
 
 - Free-text "What are you here for?" replaced by two buttons: **Wasting time**
   (stop; tab goes to the dashboard) and **Being productive** (in for 10 min,
-  then re-asked every 10 min). James: the answer was always "wasting time".
+  then re-asked every 10 min). the user: the answer was always "wasting time".
 - **Meditation gate**: the first "productive" of the day asks "Have you
   meditated today?"; No means stop and meditate first; Yes is remembered for
   the day.
 - An **unanswered** screen counts as wasting time after 60 s and closes X. It
   no longer vanishes: the vanish was a bug (with its own window in front the
-  collector saw no X, so the interrupter thought James had left).
+  collector saw no X, so the interrupter thought the user had left).
 - **Watch list on the dashboard**: which sites/apps get the screen, limits and
   global timings are edited on the page and saved to the config file; all
-  three agents hot-reload it. Built because James is handing the tool to his
+  three agents hot-reload it. Built because the user is handing the tool to his
   team as a time tracker and "net nanny".
 - Installer made portable (per-user labels, detected python3, no hard-coded
   paths) so teammates can run `./install.sh` on their own Mac.

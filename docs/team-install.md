@@ -42,14 +42,30 @@ Click **Allow** or **OK** on each. If Accessibility opens System Settings,
 switch on **python3** in the list, then re-run the command above until every
 line says OK.
 
-## 5. Open the dashboard
+## 5. Open the dashboard and make it yours
 
-http://127.0.0.1:8765 (bookmark it). It fills up as you use the Mac.
+http://127.0.0.1:8765. That address means "this Mac": nobody else can open
+it, and on your colleague's Mac it shows their data, not yours.
 
-Scroll to **Watch list and settings** to choose which sites and apps get the
-pause screen, how long "productive" buys you, and whether the "have you
-meditated today?" question is on. Click **Save**. Or click **Watch** next to
-anything in the day's list to start watching it.
+The page opens with a **Make it yours** note. Scroll to **Watch list and
+settings** and set two things:
+
+1. **What you drift onto.** Add the sites and apps you want the pause screen
+   for (your equivalent of X and YouTube), and remove the ones that aren't
+   yours. Or click **Watch** next to anything in the day's list.
+2. **What you should be doing instead.** Fill in "Instead of drifting, I
+   should: ...", for example "Call a client", "Go for a walk", "Meditate".
+   It shows on every pause screen, and once a day, before the screen lets you
+   through as "productive", it asks whether you've done it yet.
+
+Click **Save**. The trackers pick it up within seconds.
+
+## 6. Put it in the Dock as an app
+
+In **Safari**, open http://127.0.0.1:8765 and choose **File > Add to Dock**.
+TimeTrack then has its own icon and window, no address bar or tabs, and it
+behaves like any other app. (Chrome: menu > Cast, save and share > Install
+page as app. Arc can't do this; use Safari for this one step.)
 
 ## Everyday
 

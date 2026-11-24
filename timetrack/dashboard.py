@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import logging
 import threading
 from datetime import date, timedelta
@@ -14,6 +15,10 @@ from .rules import CONFIG_PATH, Rules, load as load_config
 
 log = logging.getLogger("timetrack.dashboard")
 HTML_PATH = Path(__file__).resolve().parent / "dashboard.html"
+ICON_PATH = Path(__file__).resolve().parent / "icon.png"
+MANIFEST = {"name": "TimeTrack", "short_name": "TimeTrack", "start_url": "/", "display": "standalone",
+            "background_color": "#fcfcfb", "theme_color": "#2a78d6",
+            "icons": [{"src": "/icon.png", "sizes": "512x512", "type": "image/png"}]}
 
 _lock = threading.Lock()
 
@@ -93,6 +98,9 @@ class Handler(BaseHTTPRequestHandler):
                 with _lock:
                     cfg = validate_config(body, load_config())
                     save_config(cfg)
+                    conn = db.connect()
+                    conn.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('setup_done','1')")
+                    conn.commit(); conn.close()
                 log.info("config saved from dashboard: %d categories", len(cfg["categories"]))
                 self._json({"ok": True, "config": cfg})
             else:
@@ -109,10 +117,14 @@ class Handler(BaseHTTPRequestHandler):
         u = urlsplit(self.path)
         qs = parse_qs(u.query)
         try:
-            if u.path == "/":
-                body = HTML_PATH.read_bytes()
+            static = {"/": (HTML_PATH.read_bytes, "text/html; charset=utf-8"),
+                      "/icon.png": (ICON_PATH.read_bytes, "image/png"),
+                      "/manifest.json": (lambda: json.dumps(MANIFEST).encode(), "application/manifest+json")}
+            if u.path in static:
+                read, ctype = static[u.path]
+                body = read()
                 self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
@@ -137,8 +149,10 @@ class Handler(BaseHTTPRequestHandler):
                         "SELECT ts,category,kind,choice,intention,session_seconds,today_seconds FROM decisions "
                         "WHERE ts>=? AND ts<? ORDER BY ts DESC", (d0, d1))]
                     s["interrupts_enabled"] = bool(rules.interrupts.get("enabled", True))
-                    m = conn.execute("SELECT value FROM meta WHERE key='meditated_date'").fetchone()
-                    s["meditated_today"] = bool(m and m["value"] == d.isoformat()) if d == date.today() else None
+                    meta = {r["key"]: r["value"] for r in conn.execute("SELECT key,value FROM meta")}
+                    done = meta.get("instead_done_date") == d.isoformat() or meta.get("meditated_date") == d.isoformat()
+                    s["instead_done_today"] = done if d == date.today() else None
+                    s["setup_done"] = meta.get("setup_done") == "1"
                     self._json(s)
                 elif u.path == "/api/week":
                     end = _date(qs, "end")
@@ -171,7 +185,7 @@ def _clean_list(v, lower=False):
         v = v.replace("\n", ",").split(",")
     out = []
     for x in v or []:
-        x = str(x).strip()
+        x = re.sub(r'[<>"\\\x00-\x1f]', "", str(x)).strip()
         if lower:
             x = x.lower()
             if x.startswith("www."):
@@ -190,13 +204,16 @@ def validate_config(new: dict, current: dict) -> dict:
                         ("timeout_seconds", 10, 600), ("digest_hour", 0, 23)):
         if key in it:
             cur_it[key] = max(lo, min(hi, int(it[key])))
-    for key in ("enabled", "meditation_gate"):
+    for key in ("enabled", "instead_gate"):
         if key in it:
             cur_it[key] = bool(it[key])
+    if "instead" in it:
+        cur_it["instead"] = str(it["instead"] or "").strip()[:120]
+    cur_it.pop("meditation_gate", None)
     if "categories" in new:
         cats = {}
         for name, spec in new["categories"].items():
-            name = str(name).strip()[:40]
+            name = re.sub(r'[<>"\\\x00-\x1f]', "", str(name)).strip()[:40]
             if not name:
                 continue
             c = {
@@ -205,6 +222,9 @@ def validate_config(new: dict, current: dict) -> dict:
                 "phone_apps": _clean_list(spec.get("phone_apps")),
                 "passive": bool(spec.get("passive")),
             }
+            instead = str(spec.get("instead") or "").strip()[:120]
+            if instead:
+                c["instead"] = instead
             if not (c["domains"] or c["apps"] or c["phone_apps"]):
                 continue
             lim = spec.get("limits")

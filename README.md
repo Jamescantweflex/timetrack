@@ -44,7 +44,8 @@ python3 -m timetrack probe
 ```
 
 4. Open http://127.0.0.1:8765, scroll to **Watch list and settings**, and
-   choose which sites and apps get the "productive or wasting time?" screen.
+   choose which sites and apps get the "productive or wasting time?" screen, and
+   what you should be doing instead. Safari > File > Add to Dock makes it an app.
    Or click **Watch** next to anything in the day's list.
 
 Everything stays on that Mac. Nothing is sent anywhere. The iPhone part is
