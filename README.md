@@ -27,6 +27,8 @@ Logs: `~/Library/Logs/TimeTrack/`. Data: `~/Library/Application Support/TimeTrac
 
 ## Install for a teammate (any Mac)
 
+Plain-English version: `docs/team-install.md`.
+
 1. Install Python 3 from python.org (the macOS installer includes tkinter).
 2. Copy this folder anywhere, e.g. `~/timetrack`, and run:
 
