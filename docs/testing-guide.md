@@ -87,3 +87,29 @@ Known limits, by design:
   you've walked away. Any other site stops counting after 3 minutes idle.
 - An open with no close from the phone is capped at 30 minutes.
 - Phone Safari visits to x.com are not seen, only the apps.
+
+## 7. Browser test record (24 Nov 2026)
+
+Live on this Mac, each browser opened on x.com by script, keys sent via
+System Events, outcome read from the interrupter log and the tab URL.
+
+| Browser | Wasting time (Esc) | No answer | Productive (Return) |
+|---|---|---|---|
+| Arc | screen 6.5 s, tab → dashboard | closed after 72 s, tab → dashboard | back on X |
+| Google Chrome | screen 5.7 s (2.7 s warm), tab → dashboard | closed after 72 s, tab → dashboard | back on X |
+| Safari | screen 5.4 s (2.2 s warm), tab → dashboard | closed after 72 s, tab → dashboard | back on X |
+
+Open-to-screen is 5 to 7 s on a cold launch of the browser and 2 to 3 s once
+it is running. Redirect behaviour is identical across the three. Two things
+that looked like failures during the run and were not:
+
+- **Idle.** With nobody touching the keyboard or mouse for 3 minutes the
+  collector stops recording, so no pause screen appears. When testing by
+  script, tap a key first.
+- **Safari and a foreign AppleScript client.** Asking Safari for its URL from
+  a shell that hasn't been granted Automation puts up a macOS permission
+  dialog, and while it is open Safari answers no AppleScript at all, including
+  the collector's. Clears when the dialog is dismissed. Only the python3 the
+  agents run under needs the permission; don't test with another client.
+- **Restarting the interrupter** forgets the 10-minute "productive" allowance
+  and re-prompts for whatever tracked site is in front.
