@@ -1,5 +1,8 @@
 # TimeTrack: install on your Mac (10 minutes)
 
+The full explainer, including how it works and troubleshooting, is the
+[README](../README.md). This is the short version.
+
 TimeTrack shows you where your screen time goes and, for sites you choose,
 puts up a full-screen "Productive, or wasting time?" question when you open
 them. Everything stays on your Mac. Nothing is uploaded anywhere.
@@ -64,8 +67,9 @@ Click **Save**. The trackers pick it up within seconds.
 
 In **Safari**, open http://127.0.0.1:8765 and choose **File > Add to Dock**.
 TimeTrack then has its own icon and window, no address bar or tabs, and it
-behaves like any other app. (Chrome: menu > Cast, save and share > Install
-page as app. Arc can't do this; use Safari for this one step.)
+behaves like any other app. Chrome: **⋮ > Cast, save, and share > Install page as app**. Arc doesn't
+support this (Arc's own help centre says so); use Safari for this one step, or
+bookmark the address in Arc. TimeTrack tracks Arc fine either way.
 
 ## Everyday
 
