@@ -110,6 +110,25 @@
         "Messages"
       ],
       "passive": false
+    },
+    "Calls": {
+      "domains": [
+        "meet.google.com",
+        "zoom.us",
+        "teams.microsoft.com"
+      ],
+      "apps": [
+        "MSTeams",
+        "Microsoft Teams",
+        "zoom.us",
+        "FaceTime"
+      ],
+      "phone_apps": [
+        "FaceTime",
+        "Zoom",
+        "Teams"
+      ],
+      "passive": true
     }
   }
 }
