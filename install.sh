@@ -40,9 +40,6 @@ $extra  <key>StandardOutPath</key><string>$LOGS/$name.log</string>
 for name in collector dashboard interrupter; do
   label="$LABEL_PREFIX.$name"
   launchctl bootout "gui/$UID/$label" 2>/dev/null || true
-  # older installs used a different label
-  launchctl bootout "gui/$UID/com.timetrack.legacy.$name" 2>/dev/null || true
-  rm -f "$AGENTS/com.timetrack.legacy.$name.plist"
   if [[ "${1:-}" == "uninstall" ]]; then rm -f "$AGENTS/$label.plist"; echo "removed $label"; continue; fi
   case $name in
     collector)   write_plist collector -m timetrack collect ;;
