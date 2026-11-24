@@ -61,9 +61,17 @@ bars, the last 7 days, time by hour of day, every pause screen and what you
 chose, and the full list of where the day went. The **Watch list and
 settings** panel at the bottom is where you make it yours.
 
-**Three background programs** do this: the *collector* (recording), the
-*interrupter* (pause screens and the 8am digest notification), and the
-*dashboard* (the web page). They start at login and restart if they crash.
+**The menu-bar icon.** A small hourglass at the top right of the screen shows
+today's time on your watched sites. Click it for the breakdown per site
+against its budget, your Instead action, a shortcut to the dashboard, and
+**Snooze** for 30 minutes, 1 hour or 2 hours when you're presenting or in a
+meeting. The icon changes to an exclamation mark when you're over a daily
+budget and a moon while snoozed.
+
+**Four background programs** do this: the *collector* (recording), the
+*interrupter* (pause screens and the 8am digest notification), the
+*dashboard* (the web page) and the *menu bar* icon. They start at login and
+restart if they crash.
 
 ---
 
@@ -93,7 +101,8 @@ cd ~/timetrack
 zsh install.sh
 ```
 
-You should see three `started` lines and the dashboard address.
+You should see four `started` lines and the dashboard address, and an
+hourglass icon appears in the menu bar at the top right of the screen.
 
 ### 4. Permissions
 
@@ -172,8 +181,8 @@ data, not yours.
 
 - **Esc** = wasting time. **Return** = productive. The hint at the bottom of
   the screen repeats this.
-- **Snooze** pause screens for a while: `cd ~/timetrack` then
-  `python3 -m timetrack snooze 90` (minutes).
+- **Snooze** pause screens for a while: click the menu-bar hourglass and pick
+  a length. (Terminal equivalent: `python3 -m timetrack snooze 90`.)
 - **Turn pause screens off** entirely: untick *Pause screens on* in settings.
 - **Report in Terminal:** `python3 -m timetrack report --sessions`.
 - **Morning digest:** an 8am notification with yesterday's totals.
@@ -197,6 +206,7 @@ so copy that file across first if you've customised it.)
 | Dashboard shows nothing, `status` says collector ALIVE | A permission wasn't granted | Run `python3 -m timetrack probe` again; every line must say OK |
 | Pause screen never appears | Site isn't in a category with *Pause screen* ticked; or you answered "productive" in the last 10 minutes; or snoozed | Check settings; `python3 -m timetrack status` shows snooze |
 | Pause screen appears for the wrong thing | Domain matches by suffix | Narrow the domain in settings |
+| Menu-bar icon shows `–` or is missing | Dashboard program isn't running, or the menu bar is full and macOS has hidden it | `cd ~/timetrack` then `zsh install.sh`; quit a few other menu-bar apps |
 | Dashboard page won't load | Programs aren't running | `cd ~/timetrack` then `zsh install.sh` |
 | "Need Python 3.10+ with tkinter" | Built-in Python | Install from python.org (step 1) |
 | A long call shows as a few minutes | Idle rule | Add the app or site to the **Calls** category |
@@ -242,6 +252,8 @@ Python 3.10+, standard library only (sqlite3, tkinter, http.server,
 osascript). `timetrack/collector.py` records, `timetrack/engine.py` is the
 pure interrupt state machine, `timetrack/interrupter.py` is the Tk pause
 screen, `timetrack/dashboard.py` + `dashboard.html` the web page,
+`timetrack/menubar.js` the menu-bar item (JavaScript for Automation, drawing
+what `menubar.py` computes),
 `timetrack/rules.py` the config. Design notes in
 [docs/design.md](docs/design.md).
 
@@ -249,5 +261,6 @@ screen, `timetrack/dashboard.py` + `dashboard.html` the web page,
 python3 tests/test_engine.py
 python3 tests/test_collector.py
 python3 tests/test_dashboard.py
+python3 tests/test_menubar.py
 python3 -m timetrack demo --kind pause   # the screen with fake numbers
 ```

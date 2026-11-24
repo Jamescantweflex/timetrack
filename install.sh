@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Install (or reinstall) TimeTrack's launchd agents for the current user, on any Mac.
-# Usage: ./install.sh            install/restart all three agents
+# Usage: ./install.sh            install/restart all four agents
 #        ./install.sh uninstall  stop and remove them (data is kept)
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -17,15 +17,17 @@ LABEL_PREFIX="com.timetrack.$(id -un)"
 write_plist() {   # name, args..., writes $AGENTS/$label.plist
   local name="$1"; shift
   local label="$LABEL_PREFIX.$name"
+  local prog="$PY"
+  [[ "$name" == "menubar" ]] && prog="/usr/bin/osascript"
   local args=""; for a in "$@"; do args+="    <string>$a</string>\n"; done
   local extra=""
-  [[ "$name" == "interrupter" ]] && extra="  <key>ProcessType</key><string>Interactive</string>\n  <key>EnvironmentVariables</key><dict><key>PYTHONUNBUFFERED</key><string>1</string></dict>\n"
+  [[ "$name" == "interrupter" || "$name" == "menubar" ]] && extra="  <key>ProcessType</key><string>Interactive</string>\n  <key>EnvironmentVariables</key><dict><key>PYTHONUNBUFFERED</key><string>1</string></dict>\n"
   printf '%b' "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\"><dict>
   <key>Label</key><string>$label</string>
   <key>ProgramArguments</key><array>
-    <string>$PY</string>
+    <string>$prog</string>
 $args  </array>
   <key>WorkingDirectory</key><string>$HERE</string>
   <key>RunAtLoad</key><true/>
@@ -37,7 +39,7 @@ $extra  <key>StandardOutPath</key><string>$LOGS/$name.log</string>
 " > "$AGENTS/$label.plist"
 }
 
-for name in collector dashboard interrupter; do
+for name in collector dashboard interrupter menubar; do
   label="$LABEL_PREFIX.$name"
   launchctl bootout "gui/$UID/$label" 2>/dev/null || true
   if [[ "${1:-}" == "uninstall" ]]; then rm -f "$AGENTS/$label.plist"; echo "removed $label"; continue; fi
@@ -45,6 +47,7 @@ for name in collector dashboard interrupter; do
     collector)   write_plist collector -m timetrack collect ;;
     dashboard)   write_plist dashboard -m timetrack serve --port 8765 ;;
     interrupter) write_plist interrupter -m timetrack interrupt ;;
+    menubar)     write_plist menubar -l JavaScript "$HERE/timetrack/menubar.js" ;;
   esac
   ok=0
   for try in 1 2 3 4 5 6; do
@@ -56,7 +59,7 @@ done
 
 if [[ "${1:-}" != "uninstall" ]]; then
   sleep 2
-  for name in collector dashboard interrupter; do
+  for name in collector dashboard interrupter menubar; do
     printf "%-12s " "$name"; launchctl print "gui/$UID/$LABEL_PREFIX.$name" 2>/dev/null | grep -E "^\s+pid = " | head -1 || echo "not running"
   done
   echo

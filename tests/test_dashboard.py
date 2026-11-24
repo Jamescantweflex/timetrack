@@ -57,6 +57,20 @@ def test_link_from_another_site_opens_the_page():
                "POST", payload)[0] == 403              # cross-site form submit still refused
 
 
+def test_menubar_and_snooze():
+    code, body = req("/api/menubar")
+    d = json.loads(body)
+    assert code == 200 and {"title", "symbol", "state", "lines", "snoozed"} <= set(d) and not d["snoozed"]
+    p = json.dumps({"minutes": 30}).encode()
+    assert req("/api/snooze", {"Content-Type": "application/json"}, "POST", p)[0] == 403          # no header
+    assert req("/api/snooze", {"Content-Type": "text/plain", "Origin": "https://evil.example.com"}, "POST", p)[0] == 403
+    code, body = req("/api/snooze", {"Content-Type": "application/json", "X-TimeTrack": "1"}, "POST", p)
+    assert code == 200 and json.loads(body)["snooze_until"] > 0
+    assert json.loads(req("/api/menubar")[1])["snoozed"] is True
+    req("/api/snooze", {"Content-Type": "application/json", "X-TimeTrack": "1"}, "POST", json.dumps({"minutes": 0}).encode())
+    assert json.loads(req("/api/menubar")[1])["snoozed"] is False
+
+
 def test_config_post_needs_header_and_origin():
     payload = json.dumps({"interrupts": {"enabled": True}}).encode()
     # form-style post from another site: no preflight, no header -> refused

@@ -5,12 +5,13 @@ import json
 import re
 import logging
 import threading
+import time
 from datetime import date, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from . import db, phone, rollup
+from . import db, menubar, phone, rollup
 from .rules import CONFIG_PATH, Rules, load as load_config
 
 log = logging.getLogger("timetrack.dashboard")
@@ -99,7 +100,16 @@ class Handler(BaseHTTPRequestHandler):
         try:
             n = int(self.headers.get("Content-Length", "0"))
             body = json.loads(self.rfile.read(n) or b"{}")
-            if u.path == "/api/config":
+            if u.path == "/api/snooze":
+                minutes = max(0, min(24 * 60, int(body.get("minutes", 0))))
+                until = int(time.time()) + minutes * 60 if minutes else 0
+                with _lock:
+                    conn = db.connect()
+                    conn.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('snooze_until',?)", (str(until),))
+                    conn.commit(); conn.close()
+                log.info("snooze set from menu bar: %d min", minutes)
+                self._json({"ok": True, "snooze_until": until})
+            elif u.path == "/api/config":
                 with _lock:
                     cfg = validate_config(body, load_config())
                     save_config(cfg)
@@ -159,6 +169,10 @@ class Handler(BaseHTTPRequestHandler):
                     s["instead_done_today"] = done if d == date.today() else None
                     s["setup_done"] = meta.get("setup_done") == "1"
                     self._json(s)
+                elif u.path == "/api/menubar":
+                    meta = {r["key"]: r["value"] for r in conn.execute("SELECT key,value FROM meta")}
+                    lim = {c: rules.limits(c) for c in rules.tracked_names() if rules.limits(c)}
+                    self._json(menubar.build(rollup.summary(conn, date.today(), rules), lim, rules.interrupts, meta))
                 elif u.path == "/api/week":
                     end = _date(qs, "end")
                     self._json({"days": rollup.week(conn, end, rules, int(qs.get("days", ["7"])[0])),
@@ -173,7 +187,6 @@ class Handler(BaseHTTPRequestHandler):
                     self._json(load_config())
                 elif u.path == "/api/status":
                     r = conn.execute("SELECT end FROM spans WHERE source='mac' ORDER BY end DESC LIMIT 1").fetchone()
-                    import time
                     age = int(time.time()) - r["end"] if r else None
                     ub = conn.execute("SELECT value FROM meta WHERE key='untracked_browser'").fetchone()
                     untracked = None

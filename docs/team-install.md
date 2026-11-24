@@ -29,7 +29,9 @@ cd ~/timetrack
 zsh install.sh
 ```
 
-You should see three "started" lines and a dashboard address.
+You should see four "started" lines and a dashboard address, and an
+hourglass icon appears in the menu bar at the top right. Click it any time
+for today's numbers, the dashboard, or to snooze the pause screens.
 
 ## 4. Grant permissions
 
@@ -76,8 +78,8 @@ bookmark the address in Arc. TimeTrack tracks Arc fine either way.
 - The pause screen: **Esc** = wasting time, closes the tab and sends you to
   the dashboard. **Return** = productive, buys 10 minutes, then asks again.
   No answer for 60 seconds counts as wasting time.
-- Turn it off for a while: in Terminal, `cd ~/timetrack` then
-  `python3 -m timetrack snooze 90` (minutes).
+- Turn it off for a while: click the hourglass in the menu bar and choose a
+  snooze length.
 - Remove it completely: `cd ~/timetrack` then `zsh install.sh uninstall`.
 
 ## iPhone (optional)
