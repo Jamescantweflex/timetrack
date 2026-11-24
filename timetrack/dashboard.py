@@ -50,6 +50,11 @@ def _same_site(headers) -> bool:
     Sec-Fetch-Site is set by every current browser; Origin is set on POSTs."""
     sfs = headers.get("Sec-Fetch-Site")
     if sfs and sfs not in ("same-origin", "none"):
+        # A link clicked on another site is a top-level navigation: the user
+        # lands on our page, the other site learns nothing. Allow that, and
+        # only that; a cross-site fetch/XHR of our JSON stays refused.
+        if headers.get("Sec-Fetch-Mode") == "navigate" and headers.get("Sec-Fetch-Dest") in ("document", "empty", None):
+            return True
         return False
     origin = headers.get("Origin")
     if origin and origin != "null":

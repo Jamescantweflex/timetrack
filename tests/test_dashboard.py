@@ -47,6 +47,16 @@ def test_cross_site_fetch_is_refused():
     assert req("/api/day", {"Sec-Fetch-Site": "none"})[0] == 200   # typed in the address bar
 
 
+def test_link_from_another_site_opens_the_page():
+    nav = {"Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "navigate", "Sec-Fetch-Dest": "document"}
+    assert req("/", nav)[0] == 200                       # clicked a link on github.com
+    assert req("/api/day", {"Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "cors"})[0] == 403
+    assert req("/api/day", {"Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "no-cors", "Sec-Fetch-Dest": "script"})[0] == 403
+    payload = json.dumps({"interrupts": {"enabled": True}}).encode()
+    assert req("/api/config", {**nav, "Content-Type": "text/plain", "Origin": "https://evil.example.com"},
+               "POST", payload)[0] == 403              # cross-site form submit still refused
+
+
 def test_config_post_needs_header_and_origin():
     payload = json.dumps({"interrupts": {"enabled": True}}).encode()
     # form-style post from another site: no preflight, no header -> refused
