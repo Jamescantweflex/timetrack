@@ -64,6 +64,7 @@ file on every request.
 
 ```bash
 python3 tests/test_collector.py
+python3 tests/test_dashboard.py   # only this machine, only its own page, may talk to the server
 ```
 
 ## Interrupts

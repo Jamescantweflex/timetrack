@@ -23,8 +23,52 @@ def _date(qs: dict, key: str = "date") -> date:
     return date.fromisoformat(v) if v else date.today()
 
 
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "[::1]"}
+
+
+def _host_ok(host: str | None) -> bool:
+    """Only answer requests addressed to this machine by name. Defeats DNS
+    rebinding, where a web page points its own hostname at 127.0.0.1 and reads
+    our data through it."""
+    if not host:
+        return False
+    h = host.strip().lower()
+    if h.startswith("["):                      # [::1]:8765
+        h = h.split("]")[0] + "]"
+    else:
+        h = h.split(":")[0]
+    return h in LOCAL_HOSTS
+
+
+def _same_site(headers) -> bool:
+    """A browser page on another origin may not read or change anything.
+    Sec-Fetch-Site is set by every current browser; Origin is set on POSTs."""
+    sfs = headers.get("Sec-Fetch-Site")
+    if sfs and sfs not in ("same-origin", "none"):
+        return False
+    origin = headers.get("Origin")
+    if origin and origin != "null":
+        try:
+            if not _host_ok(urlsplit(origin).netloc):
+                return False
+        except ValueError:
+            return False
+    return True
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "TimeTrack/0.1"
+
+    def _guard(self, write: bool = False) -> bool:
+        if not _host_ok(self.headers.get("Host")) or not _same_site(self.headers):
+            self._json({"error": "forbidden"}, 403)
+            return False
+        if write and self.headers.get("X-TimeTrack") != "1":
+            # Custom header: a page on another site can't add it without a
+            # CORS preflight, which we never approve.
+            self._json({"error": "forbidden"}, 403)
+            return False
+        return True
 
     def log_message(self, fmt, *args):  # quieter
         log.debug(fmt, *args)
@@ -39,6 +83,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
+        if not self._guard(write=True):
+            return
         u = urlsplit(self.path)
         try:
             n = int(self.headers.get("Content-Length", "0"))
@@ -58,6 +104,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"error": str(e)}, 500)
 
     def do_GET(self):
+        if not self._guard():
+            return
         u = urlsplit(self.path)
         qs = parse_qs(u.query)
         try:

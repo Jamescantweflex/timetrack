@@ -363,7 +363,7 @@ function readSettingsForm() {
 async function saveConfig(payload) {
   const msg = document.getElementById('saveMsg');
   msg.className = ''; msg.textContent = 'Saving…';
-  const r = await fetch('/api/config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+  const r = await fetch('/api/config', { method: 'POST', headers: {'Content-Type': 'application/json', 'X-TimeTrack': '1'}, body: JSON.stringify(payload) });
   const j = await r.json();
   if (!r.ok) { msg.className = 'err'; msg.textContent = 'Not saved: ' + (j.error || r.status); return false; }
   CFG = j.config; renderSettings(); load();
