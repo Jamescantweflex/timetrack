@@ -92,6 +92,22 @@ def test_ignored_app_and_native_app():
     assert len(s) == 1 and s[0]["app"] == "Xcode" and s[0]["domain"] is None and s[0]["end_kind"] == "switch"
 
 
+
+def test_unreadable_browser_is_flagged_once_and_in_meta():
+    fake, conn, col = make()
+    fake.front = C.Front("Firefox", None, "Mozilla Firefox")
+    col.tick(now=1000); col.tick(now=1005); col.tick(now=1010)
+    v = conn.execute("SELECT value FROM meta WHERE key='untracked_browser'").fetchone()[0]
+    assert v == "Firefox|1010", v
+    assert col._untracked_logged == "Firefox"
+    # time is still recorded, as the bare app
+    r = conn.execute("SELECT app, domain FROM spans").fetchone()
+    assert r[0] == "Firefox" and r[1] is None
+    fake.front = C.Front("Arc", "https://x.com/home", "X")
+    col.tick(now=1015)
+    assert C.installed_browsers()  # Safari at least
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

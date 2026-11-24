@@ -55,6 +55,26 @@ end tell
 """
 
 CHROMIUM_APPS = {"Arc", "Google Chrome", "Brave Browser", "Microsoft Edge"}
+READABLE_BROWSERS = CHROMIUM_APPS | {"Safari"}
+# Browsers with no AppleScript access to the current tab's URL: we can see the
+# app is in front, but not which site. Time there is recorded as the bare app.
+UNREADABLE_BROWSERS = {"Firefox", "Firefox Developer Edition", "Zen", "Zen Browser", "Floorp",
+                       "LibreWolf", "Waterfox", "Tor Browser", "Mullvad Browser"}
+
+
+def installed_browsers() -> list[str]:
+    """Readable browsers present in /Applications or ~/Applications (Safari is always there)."""
+    from pathlib import Path
+    found = []
+    for app in sorted(READABLE_BROWSERS):
+        for base in (Path("/Applications"), Path.home() / "Applications", Path("/System/Applications"),
+                     Path("/System/Volumes/Preboot/Cryptexes/App/System/Applications")):
+            if (base / f"{app}.app").exists():
+                found.append(app)
+                break
+    if "Safari" not in found and Path("/Applications/Safari.app").exists():
+        found.append("Safari")
+    return found
 
 
 def _osascript(script: str, timeout: float = 10) -> str | None:
@@ -217,6 +237,8 @@ class Collector:
             self._close(now, "switch")
             return
 
+        if f.app in UNREADABLE_BROWSERS:
+            self._note_untracked_browser(now, f.app)
         domain = domain_of(f.url) if self.rules.is_browser(f.app) else None
         key = (f.app, domain, f.title)
         if self.current_id is not None and key == self.current_key:
@@ -224,6 +246,14 @@ class Collector:
         else:
             self._close(now, "switch")
             self._open(now, f, domain)
+
+    def _note_untracked_browser(self, now: int, app: str) -> None:
+        """Once per run in the log; always in meta so the dashboard can show a notice."""
+        if getattr(self, "_untracked_logged", None) != app:
+            self._untracked_logged = app
+            log.warning("%s is in front but its tabs can't be read; time there is recorded as '%s' only. "
+                        "Use Arc, Chrome or Safari for tracked sites.", app, app)
+        self.conn.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('untracked_browser',?)", (f"{app}|{now}",))
 
     def _reload_rules_if_changed(self) -> None:
         from .rules import CONFIG_PATH

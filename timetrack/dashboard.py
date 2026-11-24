@@ -170,8 +170,15 @@ class Handler(BaseHTTPRequestHandler):
                     r = conn.execute("SELECT end FROM spans WHERE source='mac' ORDER BY end DESC LIMIT 1").fetchone()
                     import time
                     age = int(time.time()) - r["end"] if r else None
+                    ub = conn.execute("SELECT value FROM meta WHERE key='untracked_browser'").fetchone()
+                    untracked = None
+                    if ub and "|" in ub["value"]:
+                        name, ts = ub["value"].rsplit("|", 1)
+                        if ts.isdigit() and time.time() - int(ts) < 2 * 3600:   # seen in the last two hours
+                            untracked = name
                     self._json({"collector_alive": age is not None and age < 30, "last_heartbeat_age": age,
-                                "phone_file": str(phone.EVENTS_PATH), "phone_file_exists": phone.EVENTS_PATH.exists()})
+                                "phone_file": str(phone.EVENTS_PATH), "phone_file_exists": phone.EVENTS_PATH.exists(),
+                                "untracked_browser": untracked})
                 else:
                     self._json({"error": "not found"}, 404)
                 conn.close()

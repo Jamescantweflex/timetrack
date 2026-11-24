@@ -61,6 +61,6 @@ if [[ "${1:-}" != "uninstall" ]]; then
   done
   echo
   echo "Dashboard: http://127.0.0.1:8765"
-  echo "First run: macOS will ask to let python3 control System Events and your browser. Click Allow each time."
+  echo "First run: macOS will ask to let python3 control System Events and each browser you have installed. Click Allow each time."
   echo "To trigger all those prompts now:  $PY -m timetrack probe"
 fi

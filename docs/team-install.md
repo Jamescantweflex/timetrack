@@ -40,7 +40,7 @@ python3 -m timetrack probe
 ```
 
 macOS will show several permission dialogs: letting Python control
-"System Events", your browser (Chrome, Arc, Safari), and Accessibility.
+"System Events", each browser you have installed (Safari, and Chrome or Arc if present), and Accessibility.
 Click **Allow** or **OK** on each. If Accessibility opens System Settings,
 switch on **python3** in the list, then re-run the command above until every
 line says OK.

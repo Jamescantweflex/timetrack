@@ -104,7 +104,7 @@ python3 -m timetrack probe
 ```
 
 macOS will show several dialogs asking to let Python control **System
-Events**, your browser (Chrome, Arc, Safari), and **Accessibility**. Click
+Events**, each browser you have installed (Safari, and Chrome or Arc if present), and **Accessibility**. Click
 **Allow** or **OK** on each one. If Accessibility opens System Settings,
 switch on **python3** in the list. Run the command again until every line
 says `OK`.
@@ -219,6 +219,14 @@ Support/TimeTrack/timetrack.db`.
 - The permissions you grant (controlling System Events and your browser,
   Accessibility) are what let it see the front window and close a tab. Grant
   them to the Python you installed, nothing else.
+
+## Browsers
+
+Tracked by site: **Safari, Google Chrome, Arc**, plus Brave and Edge. Firefox
+and Firefox-based browsers (Zen, LibreWolf, ...) don't let anything read the
+current tab, so time there is recorded as "Firefox" without the site, and the
+dashboard status line says so. Use one of the tracked browsers for the sites
+you want the pause screen on.
 
 ## iPhone (optional)
 

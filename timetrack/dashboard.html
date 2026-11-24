@@ -226,7 +226,8 @@ function setupBanner(done) {
 function renderStatus(st) {
   const el = document.getElementById('status');
   const phone = st.phone_file_exists ? 'phone file found' : 'phone shortcut not set up yet';
-  el.innerHTML = `<span class="dot ${st.collector_alive?'on':''}"></span>collector ${st.collector_alive ? 'running' : 'NOT running'} · ${phone}`;
+  const ub = st.untracked_browser ? ` · <span style="color:var(--s2)">${esc(st.untracked_browser)} is in front but can't be tracked. Use Arc, Chrome or Safari for tracked time.</span>` : '';
+  el.innerHTML = `<span class="dot ${st.collector_alive?'on':''}"></span>collector ${st.collector_alive ? 'running' : 'NOT running'} · ${phone}${ub}`;
 }
 
 function renderTiles(s) {
