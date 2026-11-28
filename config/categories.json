@@ -75,6 +75,20 @@
       ],
       "passive": false
     },
+    "ChatGPT": {
+      "domains": [
+        "chatgpt.com",
+        "chat.openai.com"
+      ],
+      "apps": [
+        "ChatGPT",
+        "Codex"
+      ],
+      "phone_apps": [
+        "ChatGPT"
+      ],
+      "passive": false
+    },
     "Email": {
       "domains": [
         "mail.google.com",

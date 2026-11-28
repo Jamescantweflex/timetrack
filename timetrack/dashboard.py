@@ -154,7 +154,7 @@ class Handler(BaseHTTPRequestHandler):
                 if u.path == "/api/day":
                     d = _date(qs)
                     s = rollup.summary(conn, d, rules)
-                    h = rollup.hourly(conn, d, rules, s["tracked"])
+                    h = rollup.hourly(conn, d, rules)      # every app and site, not just the named ones
                     s["hours"] = h["hours"]
                     s["order"] = rules.tracked_names()
                     s["passive"] = [c for c in rules.tracked_names() if rules.is_passive(c)]

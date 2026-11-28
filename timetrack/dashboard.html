@@ -104,13 +104,13 @@ button.danger { color: var(--bad); }
 <div class="grid2">
   <div class="card">
     <h2>Last 7 days</h2>
-    <div class="hint">Minutes per day, tracked categories. Number above each bar is the day's opens.</div>
+    <div class="hint">All screen time per day. Colours are your named categories, grey is everything else. Number above each bar is opens of named categories.</div>
     <div id="week"></div>
     <div class="legend" id="legend"></div>
   </div>
   <div class="card">
     <h2>By hour</h2>
-    <div class="hint">When in the day it happens. Minutes per hour, tracked categories.</div>
+    <div class="hint">When in the day it happens. Minutes per hour, every app and site.</div>
     <div id="hours"></div>
   </div>
 </div>
@@ -214,7 +214,7 @@ function renderDecisions(s) {
   const medLine = '';
   if (!rows.length) { document.getElementById('decisions').innerHTML = `<div class="empty">No pause screens this day. ${medLine}</div>`; return; }
   let h = `<div class="sub" style="color:var(--text-2);margin-bottom:8px">${rows.length} prompts · stopped ${stopped} (${to} by no answer, ${med} to do the instead thing) · productive ${prod}</div>`;
-  h += '<table><thead><tr><th>When</th><th>What</th><th>Why it came up</th><th>You chose</th><th>What you said you'd do</th><th class="num">Sitting</th><th class="num">Day total</th></tr></thead><tbody>';
+  h += '<table><thead><tr><th>When</th><th>What</th><th>Why it came up</th><th>You chose</th><th>What you said you would do</th><th class="num">Sitting</th><th class="num">Day total</th></tr></thead><tbody>';
   const kindText = {pause: 'opened it', session: 'sitting limit', daily: 'daily budget'};
   const choiceText = {bounce: 'Wasting time', go: 'Productive', more: 'Still productive', done: 'Wasting time', timeout: 'No answer', instead: 'Instead first', meditate: 'Instead first', left: 'Walked away'};
   for (const r of rows) {
@@ -256,7 +256,7 @@ function renderStatus(st) {
 function renderTiles(s) {
   const order = s.order;
   const byName = Object.fromEntries(s.categories.map(c => [c.category, c]));
-  let html = '';
+  let html = `<div class="tile total"><div class="name">All screen time</div><div class="big">${fmtHM(s.total_seconds)}</div><div class="sub">every app and site on the Mac, plus phone events</div></div>`;
   for (const name of order) {
     const c = byName[name] || {seconds:0, opens:0, mac:0, phone:0};
     const lim = (s.limits||{})[name];
@@ -271,14 +271,18 @@ function renderTiles(s) {
       <div class="big">${fmtHM(c.seconds)}</div>
       <div class="sub">${c.opens} open${c.opens===1?'':'s'} · Mac ${fmtHM(c.mac)} · phone ${fmtHM(c.phone)}</div>${budget}</div>`;
   }
-  html += `<div class="tile total"><div class="name">All tracked screen time</div><div class="big">${fmtHM(s.total_seconds)}</div><div class="sub">every app and site, Mac + phone events</div></div>`;
+  // Anything without a named category still gets a tile once it passes 5 minutes.
+  s.categories.filter(c => !order.includes(c.category) && c.seconds >= 300).slice(0, 8).forEach(c => {
+    html += `<div class="tile"><div class="name"><span class="swatch" style="background:var(--other)"></span>${esc(c.category)}</div>
+      <div class="big">${fmtHM(c.seconds)}</div><div class="sub">${c.opens} open${c.opens===1?'':'s'} · not in a category</div></div>`;
+  });
   document.getElementById('tiles').innerHTML = html;
 }
 
 function renderWeek(w) {
   const order = w.order, days = w.days;
   const W = 520, H = 220, padL = 40, padR = 8, padT = 22, padB = 26;
-  const maxSec = Math.max(60*5, ...days.map(d => order.reduce((a,n)=>a+((d.categories[n]||{}).seconds||0),0)));
+  const maxSec = Math.max(60*5, ...days.map(d => d.total_seconds || 0));
   const nm = niceMax(maxSec, 15), yMaxMin = nm.max;
   const y = v => padT + (H-padT-padB) * (1 - v/(yMaxMin*60));
   const bw = (W-padL-padR)/days.length, barW = Math.min(44, bw*0.6);
@@ -294,19 +298,27 @@ function renderWeek(w) {
       g += `<rect data-tip="${esc(d.weekday)} ${esc(d.date)} · ${esc(n)}: ${fmtHM(c.seconds)}, ${c.opens} opens" x="${x}" y="${y1+1}" width="${barW}" height="${h}" rx="2" fill="${colorOf(n, order)}"/>`;
       acc += c.seconds;
     });
+    const rest = Math.max(0, (d.total_seconds || 0) - acc);
+    if (rest >= 30) {
+      const y1 = y(acc + rest), y0 = y(acc);
+      g += `<rect data-tip="${esc(d.weekday)} ${esc(d.date)} · Everything else: ${fmtHM(rest)} · day total ${fmtHM(d.total_seconds)}" x="${x}" y="${y1+1}" width="${barW}" height="${Math.max(0, y0-y1-2)}" rx="2" fill="var(--other)"/>`;
+      acc += rest;
+    }
     if (acc) g += `<text class="vlabel" x="${x+barW/2}" y="${y(acc)-5}" text-anchor="middle">${opens}×</text>`;
     g += `<text class="axis" x="${x+barW/2}" y="${H-8}" text-anchor="middle" style="fill:var(--text-3);font-size:11px">${d.weekday}</text>`;
   });
   g += '</svg>';
   const el = document.getElementById('week'); el.innerHTML = g;
   el.querySelectorAll('rect[data-tip]').forEach(r => hover(r, esc(r.dataset.tip)));
-  document.getElementById('legend').innerHTML = order.map(n => `<span style="--c:${colorOf(n, order)}">${esc(n)}</span>`).join('');
+  document.getElementById('legend').innerHTML = order.map(n => `<span style="--c:${colorOf(n, order)}">${esc(n)}</span>`).join('') + '<span style="--c:var(--other)">Everything else</span>';
 }
 
 function renderHours(s) {
   const order = s.order, hours = s.hours || {};
   const W = 520, H = 220, padL = 40, padR = 8, padT = 12, padB = 26;
-  const totals = Array.from({length:24}, (_,h) => order.reduce((a,n)=>a+((hours[n]||[])[h]||0),0));
+  const restNames = Object.keys(hours).filter(n => !order.includes(n));
+  const rest = Array.from({length:24}, (_,h) => restNames.reduce((a,n)=>a+((hours[n]||[])[h]||0),0));
+  const totals = Array.from({length:24}, (_,h) => rest[h] + order.reduce((a,n)=>a+((hours[n]||[])[h]||0),0));
   if (!totals.some(v=>v)) { document.getElementById('hours').innerHTML = '<div class="empty">Nothing tracked yet for this day.</div>'; return; }
   const nm = niceMax(Math.max(...totals), 5), maxMin = nm.max;
   const y = v => padT + (H-padT-padB) * (1 - v/(maxMin*60));
@@ -321,6 +333,11 @@ function renderHours(s) {
       g += `<rect data-tip="${String(h).padStart(2,'0')}:00 · ${esc(n)}: ${fmtHM(sec)}" x="${x}" y="${y1+0.75}" width="${barW}" height="${hh}" rx="1.5" fill="${colorOf(n, order)}"/>`;
       acc += sec;
     });
+    if (rest[h]) {
+      const top = restNames.map(n => [n, (hours[n]||[])[h]||0]).filter(p => p[1]).sort((a,b)=>b[1]-a[1]).slice(0,3).map(p => `${p[0]} ${fmtHM(p[1])}`).join(', ');
+      const y1 = y(acc+rest[h]), y0 = y(acc);
+      g += `<rect data-tip="${String(h).padStart(2,'0')}:00 · Everything else: ${fmtHM(rest[h])} (${esc(top)})" x="${x}" y="${y1+0.75}" width="${barW}" height="${Math.max(0, y0-y1-1.5)}" rx="1.5" fill="var(--other)"/>`;
+    }
     if (h % 3 === 0) g += `<text x="${x+barW/2}" y="${H-8}" text-anchor="middle" style="fill:var(--text-3);font-size:11px">${h}</text>`;
   }
   g += '</svg>';
@@ -329,7 +346,7 @@ function renderHours(s) {
 }
 
 function renderAll(s) {
-  const rows = s.categories.filter(c => c.seconds > 0).slice(0, 20);
+  const rows = s.categories.filter(c => c.seconds > 0).slice(0, 80);
   if (!rows.length) { document.getElementById('all').innerHTML = '<div class="empty">No data for this day.</div>'; return; }
   const max = rows[0].seconds;
   let h = '<table><thead><tr><th>Category / site / app</th><th class="num">Time</th><th class="num">Opens</th><th style="width:30%"></th></tr></thead><tbody>';
