@@ -44,13 +44,16 @@ new sitting starts a full-screen window appears over everything:
 1. A short countdown (10 seconds by default) with today's total so far, and
    your **Instead** line: what you said you'd rather be doing.
 2. Two buttons. **Wasting time** (or Esc) closes that tab, sends it to the
-   dashboard, and logs the choice. **Being productive** (or Return) lets you
-   in for 10 minutes, after which it asks again.
-3. Once a day, the first time you say "productive", it asks **Have you done
-   this today?** about your Instead action. **No** means that comes first and
-   the tab closes. **Yes** lets you through and it won't ask again until
-   tomorrow.
-4. No answer for 60 seconds counts as wasting time. The screen never just
+   dashboard, and logs the choice. **Being productive** (or Return) takes you
+   to the next step.
+3. **What are you going to do?** Type one line and press Return. That lets
+   you in for 10 minutes and puts your line on the day's record, so you can
+   read back later what you said against what you did. Esc here means
+   "actually, wasting time".
+4. The 10 minutes run on the clock. Leave and come back inside them and the
+   screen stays away. When they run out it asks again, with your last line
+   filled in ready to confirm or change.
+5. No answer for 60 seconds counts as wasting time. The screen never just
    disappears.
 
 Per-sitting and per-day budgets, and a "Hard" mode that gives no override
@@ -149,9 +152,8 @@ once. Scroll to **Watch list and settings**:
    anything in the day's list.
 2. **What you should be doing instead.** Fill in *Instead of drifting, I
    should:* with the thing you'd rather be doing: "Call a client", "Go for a
-   walk", "Meditate". It shows on every pause screen, and once a day the
-   screen checks whether you've done it before letting you through as
-   productive. You can override it per category in the **Instead** column.
+   walk", "Meditate". It shows on every pause screen and on the page you land on when
+   you answer "wasting time". You can override it per category in the **Instead** column.
 3. Adjust the countdown, how long "productive" buys, and budgets if you want.
 
 Click **Save**. The background programs pick up changes within seconds.

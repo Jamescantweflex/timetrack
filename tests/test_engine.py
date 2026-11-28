@@ -32,6 +32,27 @@ def test_pause_on_open_then_go_then_session_limit():
     assert p and p.kind == "session"
 
 
+def test_leave_and_return_inside_allowance_is_quiet():
+    e, t = mk(), 1000
+    assert e.tick(t, "X", 0).kind == "pause"
+    e.answer(t + 5, "go")                         # allowed until t+605
+    assert e.tick(t + 20, "X", 20) is None
+    assert e.tick(t + 200, "X", 30) is None       # away 3 min, back: no screen
+    assert e.tick(t + 400, "Claude", 30) is None
+    assert e.tick(t + 590, "X", 40) is None       # away again, back at 9m50s: still quiet
+    p = e.tick(t + 606, "X", 56)                  # still there when the 10 min runs out
+    assert p and p.kind == "session"
+
+
+def test_return_after_allowance_ran_out_is_a_new_open():
+    e, t = mk(), 1000
+    assert e.tick(t, "X", 0).kind == "pause"
+    e.answer(t + 5, "go")
+    assert e.tick(t + 20, "X", 20) is None
+    p = e.tick(t + 700, "X", 20)                  # gone 11 min: asks again
+    assert p and p.kind == "pause"
+
+
 def test_bounce_then_reopen_prompts_again():
     e, t = mk(), 1000
     assert e.tick(t, "X", 0).kind == "pause"

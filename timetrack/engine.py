@@ -66,7 +66,11 @@ class Engine:
         new_session = now - st.last_seen > self.gap
         if new_session:
             st.session_start = now
-            st.allowed_until = None
+            # "Productive" bought time on the clock, not time on the page: coming back
+            # inside that window is not a new open. Once it has run out, it is.
+            if st.allowed_until is not None and now >= st.allowed_until:
+                st.allowed_until = None
+        in_allowance = st.allowed_until is not None and now < st.allowed_until
         st.last_seen = now
         session_seconds = now - st.session_start
 
@@ -74,7 +78,7 @@ class Engine:
         over_daily = daily_limit and today_seconds >= daily_limit
         block = bool(lim.get("block_after_daily")) and over_daily
 
-        if new_session and lim.get("pause_on_open"):
+        if new_session and lim.get("pause_on_open") and not in_allowance:
             kind = "daily" if over_daily else "pause"
             return self._emit(Prompt(kind, category, session_seconds, today_seconds, lim, block), now)
 

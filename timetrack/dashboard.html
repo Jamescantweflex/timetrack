@@ -211,11 +211,10 @@ function renderDecisions(s) {
   const stopped = rows.filter(r => ['bounce','done','timeout','meditate','instead'].includes(r.choice)).length,
         prod = rows.filter(r => ['go','more'].includes(r.choice)).length,
         med = rows.filter(r => r.choice === 'instead' || r.choice === 'meditate').length, to = rows.filter(r => r.choice === 'timeout').length;
-  const ins = (CFG.interrupts || {}).instead;
-  const medLine = !ins ? '' : (s.instead_done_today === true ? `${esc(ins)}: done today.` : (s.instead_done_today === false ? `${esc(ins)}: not yet today.` : ''));
+  const medLine = '';
   if (!rows.length) { document.getElementById('decisions').innerHTML = `<div class="empty">No pause screens this day. ${medLine}</div>`; return; }
-  let h = `<div class="sub" style="color:var(--text-2);margin-bottom:8px">${rows.length} prompts · stopped ${stopped} (${to} by no answer, ${med} to do the instead thing) · productive ${prod} · ${medLine}</div>`;
-  h += '<table><thead><tr><th>When</th><th>What</th><th>Why it came up</th><th>You chose</th><th>Note</th><th class="num">Sitting</th><th class="num">Day total</th></tr></thead><tbody>';
+  let h = `<div class="sub" style="color:var(--text-2);margin-bottom:8px">${rows.length} prompts · stopped ${stopped} (${to} by no answer, ${med} to do the instead thing) · productive ${prod}</div>`;
+  h += '<table><thead><tr><th>When</th><th>What</th><th>Why it came up</th><th>You chose</th><th>What you said you'd do</th><th class="num">Sitting</th><th class="num">Day total</th></tr></thead><tbody>';
   const kindText = {pause: 'opened it', session: 'sitting limit', daily: 'daily budget'};
   const choiceText = {bounce: 'Wasting time', go: 'Productive', more: 'Still productive', done: 'Wasting time', timeout: 'No answer', instead: 'Instead first', meditate: 'Instead first', left: 'Walked away'};
   for (const r of rows) {
@@ -369,8 +368,7 @@ function renderSettings() {
     <label>"Productive" buys <input type="number" id="g_grace" value="${it.grace_minutes ?? 10}" min="1"> min</label>
     <label>then re-asks every <input type="number" id="g_ext" value="${it.extension_minutes ?? 10}" min="1"> min</label>
     <label>No answer after <input type="number" id="g_timeout" value="${it.timeout_seconds ?? 60}" min="10"> s = wasting time</label>
-    <label style="flex-basis:100%">Instead of drifting, I should: <input type="text" id="g_instead" value="${esc(it.instead || '')}" placeholder="e.g. Meditate, Call a client, Go for a walk" style="min-width:280px"></label>
-    <label><input type="checkbox" id="g_gate" ${it.instead_gate !== false ? 'checked' : ''}> Before allowing "productive", ask once a day whether that's done</label>`;
+    <label style="flex-basis:100%">Instead of drifting, I should: <input type="text" id="g_instead" value="${esc(it.instead || '')}" placeholder="e.g. Meditate, Call a client, Go for a walk" style="min-width:280px"></label>`;
   const names = Object.keys(CFG.categories || {});
   let h = '<table><thead><tr><th>Name</th><th>Websites (comma separated)</th><th>Mac apps</th><th>iPhone apps</th><th title="Counts time with no keyboard or mouse, for video">Video</th><th title="Show the productive-or-wasting screen when a session starts">Pause screen</th><th class="num">Per sitting (min)</th><th class="num">Per day (min)</th><th title="Once over the daily budget, no override">Hard</th><th title="Overrides the general instead action for this one">Instead (optional)</th><th></th></tr></thead><tbody>';
   names.forEach((n, i) => {
@@ -404,8 +402,7 @@ function readSettingsForm() {
   return { interrupts: {
       enabled: document.getElementById('g_enabled').checked, pause_seconds: +document.getElementById('g_pause').value,
       grace_minutes: +document.getElementById('g_grace').value, extension_minutes: +document.getElementById('g_ext').value,
-      timeout_seconds: +document.getElementById('g_timeout').value, instead: document.getElementById('g_instead').value,
-      instead_gate: document.getElementById('g_gate').checked },
+      timeout_seconds: +document.getElementById('g_timeout').value, instead: document.getElementById('g_instead').value },
     categories: cats };
 }
 async function saveConfig(payload) {

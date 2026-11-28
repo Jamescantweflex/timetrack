@@ -165,8 +165,6 @@ class Handler(BaseHTTPRequestHandler):
                         "WHERE ts>=? AND ts<? ORDER BY ts DESC", (d0, d1))]
                     s["interrupts_enabled"] = bool(rules.interrupts.get("enabled", True))
                     meta = {r["key"]: r["value"] for r in conn.execute("SELECT key,value FROM meta")}
-                    done = meta.get("instead_done_date") == d.isoformat() or meta.get("meditated_date") == d.isoformat()
-                    s["instead_done_today"] = done if d == date.today() else None
                     s["setup_done"] = meta.get("setup_done") == "1"
                     self._json(s)
                 elif u.path == "/api/triggers":
@@ -232,12 +230,13 @@ def validate_config(new: dict, current: dict) -> dict:
                         ("timeout_seconds", 10, 600), ("digest_hour", 0, 23)):
         if key in it:
             cur_it[key] = max(lo, min(hi, int(it[key])))
-    for key in ("enabled", "instead_gate"):
+    for key in ("enabled",):
         if key in it:
             cur_it[key] = bool(it[key])
     if "instead" in it:
         cur_it["instead"] = str(it["instead"] or "").strip()[:120]
     cur_it.pop("meditation_gate", None)
+    cur_it.pop("instead_gate", None)
     if "categories" in new:
         cats = {}
         for name, spec in new["categories"].items():

@@ -28,7 +28,7 @@ def test_snoozed_and_off_and_instead():
     r = build(SUMMARY, LIMITS, {"enabled": True, "instead": "Walk"}, {"snooze_until": str(int(NOW) + 600)}, NOW)
     assert r["snoozed"] and r["state"] == "snoozed" and r["symbol"] == "moon.zzz"
     assert any(l.startswith("Snoozed until ") for l in r["lines"])
-    assert any(l.startswith("Instead: Walk") and "not yet today" in l for l in r["lines"])
+    assert "Instead: Walk" in r["lines"]
     r = build(SUMMARY, LIMITS, {"enabled": True}, {"snooze_until": str(int(NOW) - 5)}, NOW)
     assert not r["snoozed"]
     r = build(SUMMARY, LIMITS, {"enabled": False}, {}, NOW)

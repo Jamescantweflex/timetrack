@@ -99,6 +99,9 @@ X 10/30, YouTube 20/45. Revisit after a week of data.
 - **Meditation gate**: the first "productive" of the day asks "Have you
   meditated today?"; No means stop and meditate first; Yes is remembered for
   the day.
+  (Removed 28 Nov 2026: "productive" now leads to **What are you going to
+  do?**, a one-line answer saved with the decision. The allowance also now
+  survives leaving and coming back inside the 10 minutes.)
 - An **unanswered** screen counts as wasting time after 60 s and closes X. It
   no longer vanishes: the vanish was a bug (with its own window in front the
   collector saw no X, so the interrupter thought the user had left).

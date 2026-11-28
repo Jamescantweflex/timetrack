@@ -1,5 +1,5 @@
 {
-  "_comment": "Add a category by adding patterns. domains match by suffix (x.com matches mobile.x.com). apps match Mac app names exactly. phone_apps match the app name you type into the iPhone Shortcut. passive=true means no-input time still counts (video). limits per category: pause_on_open shows the pause screen each time a new session starts; session_minutes nudges after that long in one sitting; daily_minutes is the day's budget; block_after_daily removes the 'more time' button once the budget is spent. interrupts: grace_minutes = how long 'productive' buys before it re-asks; extension_minutes = same for the re-ask; timeout_seconds = unanswered screen counts as wasting time; meditation_gate = ask once a day whether you've meditated before letting you in. `instead` = what you should be doing rather than drifting (shown on the pause screen; per-category `instead` overrides it). `instead_gate` asks once a day whether it's done before allowing 'productive'.",
+  "_comment": "Add a category by adding patterns. domains match by suffix (x.com matches mobile.x.com). apps match Mac app names exactly. phone_apps match the app name you type into the iPhone Shortcut. passive=true means no-input time still counts (video). limits per category: pause_on_open shows the pause screen each time a new session starts; session_minutes nudges after that long in one sitting; daily_minutes is the day's budget; block_after_daily removes the 'more time' button once the budget is spent. interrupts: grace_minutes = how long 'productive' buys before it re-asks; extension_minutes = same for the re-ask; timeout_seconds = unanswered screen counts as wasting time; `instead` = what you should be doing rather than drifting (shown on the pause screen; per-category `instead` overrides it). Answering 'productive' asks what you are going to do and saves the line; the allowance survives leaving and coming back.",
   "interrupts": {
     "enabled": true,
     "pause_seconds": 10,
@@ -9,8 +9,7 @@
     "digest_hour": 8,
     "redirect_url": "http://127.0.0.1:8765/?bounced=1",
     "timeout_seconds": 60,
-    "instead": "Meditate",
-    "instead_gate": true
+    "instead": "Meditate"
   },
   "browsers": [
     "Arc",

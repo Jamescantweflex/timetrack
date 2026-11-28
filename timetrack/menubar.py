@@ -33,9 +33,7 @@ def build(summary: dict, limits: dict, interrupts: dict, meta: dict, now: float 
 
     instead = str(interrupts.get("instead") or "").strip()
     if instead:
-        today = datetime.fromtimestamp(now).date().isoformat()
-        done = meta.get("instead_done_date") == today or meta.get("meditated_date") == today
-        lines.append(f"Instead: {instead}   ·   {'done today' if done else 'not yet today'}")
+        lines.append(f"Instead: {instead}")
 
     try:
         until = int(meta.get("snooze_until") or 0)

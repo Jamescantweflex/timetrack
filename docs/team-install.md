@@ -60,8 +60,8 @@ settings** and set two things:
    yours. Or click **Watch** next to anything in the day's list.
 2. **What you should be doing instead.** Fill in "Instead of drifting, I
    should: ...", for example "Call a client", "Go for a walk", "Meditate".
-   It shows on every pause screen, and once a day, before the screen lets you
-   through as "productive", it asks whether you've done it yet.
+   It shows on every pause screen. If you answer "productive", the screen
+   asks what you're going to do and keeps your one-line answer on the record.
 
 Click **Save**. The trackers pick it up within seconds.
 
